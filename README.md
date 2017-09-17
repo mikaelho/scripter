@@ -4,13 +4,15 @@
 
 # Quick start
 
-In order to start using the animation effects, just import scripter and use the effects like this:
+In order to start using the animation effects, just import scripter and use the effects like 
+this:
 
     from scripter import *
     
     hide(my_button)
     
-All effects expect an active UI view as the first argument.
+All effects expect an active UI view as the first argument. This can well be `self` or `sender` 
+where applicable.
 
 If you want to create a more complex animation from the effects provided, combine them in a
 script:
@@ -22,20 +24,13 @@ script:
       yield
       hide(my_button)
       
-Here movement and a red highlight happen at the same time. After both actions are completed, `my_button` fades away.
-
-If you want 'built-in' animations in your custom ui.View, you can inherit from Scripter instead, as it inherits from ui.View:
-  
-    class MyView(Scripter):
-      
-      @script
-      def my_script(self):
-        self.move_to(50, 200)
-        self.pulse('red')
-        yield
-        self.hide()
+Here movement and a red highlight happen at the same time. After both actions are completed, 
+`my_button` fades away.
         
-See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
+Run scripter.py in Pythonista to see a demo of most of the available effects.
+        
+See the API documentation for individual effects and how to roll your own with `set_value`, 
+`slide_value` and `timer`.
 
 _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 
@@ -92,11 +87,13 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   * `find_scripter_instance(view)`
 
-  Scripts need a "controller" ui.View that runs the update method for them. This function finds or creates the controller for a view as follows:
-    * Check if the view itself is a Scripter
-    * Check if any of the subviews is a Scripter
-    * Repeat up the view hierarchy of superviews
-    * If not found, create as a hidden subview of the root view
+  Scripts need a "controller" ui.View that runs the update method for them. This function finds 
+  or creates the controller for a view as follows:
+    
+  * Check if the view itself is a Scripter
+  * Check if any of the subviews is a Scripter
+  * Repeat up the view hierarchy of superviews
+  * If not found, create as a hidden subview of the root view
   
   If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
   run then, you need to use this method first to find the right one.
@@ -108,13 +105,13 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   * `set_value(view, attribute, value, func=None)`
 
-  Generator that sets the `attribute` to a 
-  `value` once, or several times if the value 
-  itself is a generator.
+  Generator that sets the `attribute` to a `value` once, or several times if the value itself is a 
+  generator or an iterator.
   
   Optional keyword parameters:
-    * `func` - called with the value, returns the actual value to be set
-    * `target` - object whose attribute is to be set. If not given, `self` is used. 
+  
+  * `func` - called with the value, returns the actual value to be set
+  * `target` - object whose attribute is to be set. If not given, `self` is used. 
 
   * `slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None)`
 
@@ -122,13 +119,14 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   `attribute` to an `end_value` in a given duration.
   
   Optional keyword parameters:
-    * `target` - object whose attribute is to be set. If not given, `self` is used.
-    * `start_value` - set if you want some other value than the current value of the attribute as the animation start value.
-    * `duration` - time it takes to change to the target value. Default is 0.5 seconds.
-    * `delta_func` - use to transform the range from start_value to end_value to something else.
-    * `ease_func` - provide to change delta-t value to something else. Mostly used for easing; you can provide an easing function name as a string instead of an actual function. See supported easing functions [here](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-functions.png).
-    * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
-    * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
+    
+  * `target` - object whose attribute is to be set. If not given, `self` is used.
+  * `start_value` - set if you want some other value than the current value of the attribute as the animation start value.
+  * `duration` - time it takes to change to the target value. Default is 0.5 seconds.
+  * `delta_func` - use to transform the range from start_value to end_value to something else.
+  * `ease_func` - provide to change delta-t value to something else. Mostly used for easing; you can provide an easing function name as a string instead of an actual function. See supported easing functions [here](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-functions.png).
+  * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
+  * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
 
   * `slide_color(view, *args, **kwargs)`
 
