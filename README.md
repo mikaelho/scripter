@@ -36,15 +36,15 @@ _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 bet
 
 # API
 
-1. [Classes](#classes)
-  1. [Class: Scripter](#class-scripter)
-    1. [Methods](#methods)
-    1. [Properties](#properties)
-1. [Functions](#functions)
-  1. [Script management](#script-management)
-  1. [Effect primitives](#effect-primitives)
-  1. [Animation effects](#animation-effects)
-  1. [Additional easing functions](#additional-easing-functions)
+* [Classes](#classes)
+  * [Class: Scripter](#class-scripter)
+    * [Methods](#methods)
+    * [Properties](#properties)
+* [Functions](#functions)
+  * [Script management](#script-management)
+  * [Effect primitives](#effect-primitives)
+  * [Animation effects](#animation-effects)
+  * [Additional easing functions](#additional-easing-functions)
 
 
 # Classes
@@ -57,7 +57,7 @@ Runs at default 60 fps, or not at all when there are no scripts to run.
 
 Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
-### Methods:
+### Methods
 
 
 #### ` update(self)`
@@ -88,7 +88,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   Initializes all internal structures.
   Used at start and to cancel all running scripts.
-### Properties:
+### Properties
 
 
 #### `default_update_interval (get, set)`
@@ -96,7 +96,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
 #### `default_fps (get, set)`
 
-### Functions:
+# Functions
 
 
 #### SCRIPT MANAGEMENT
