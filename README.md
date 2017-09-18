@@ -36,18 +36,15 @@ _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 bet
 
 # API
 
-* [Classes](#classes)
-  * [Class: Scripter](#class-scripter)
-    * [Methods](#methods)
-    * [Properties](#properties)
+* [Class: Scripter](#class-scripter)
+  * [Methods](#methods)
+  * [Properties](#properties)
 * [Functions](#functions)
   * [Script management](#script-management)
   * [Effect primitives](#effect-primitives)
   * [Animation effects](#animation-effects)
   * [Additional easing functions](#additional-easing-functions)
 
-
-# Classes
 
 ## Class: Scripter
 
@@ -57,7 +54,7 @@ Runs at default 60 fps, or not at all when there are no scripts to run.
 
 Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
-### Methods
+## Methods
 
 
 #### ` update(self)`
