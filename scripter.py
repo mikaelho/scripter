@@ -51,6 +51,11 @@ def script(func):
   Decorator for the animation scripts. Scripts can be functions, methods or generators.
   
   First argument of decorated functions must always be the view to be animated.
+  
+  Calling a script starts the Scripter `update` loop, if not already running.
+  
+  New scripts suspend the execution of the parent script until all the parallel scripts have
+  completed, after which the `update` method will resume the execution of the parent script.
   '''
   
   def wrapper(view, *args, **kwargs):
@@ -106,8 +111,7 @@ def find_scripter_instance(view):
 class Scripter(View):
   
   '''
-  Class that contains the update method used to run the scripts and to control their execution
-  order.
+  Class that contains the `update` method used to run the scripts and to control their execution.
   
   Runs at default 60 fps, or not at all when there are no scripts to run.
   
@@ -126,6 +130,11 @@ class Scripter(View):
   
   @property
   def default_update_interval(self):
+    '''
+    The running rate for the update method. Frames per second is here considered to be just an
+    alternative way of setting the update interval, and this property is linked to
+    `default_fps` - change one and the other will change as well.
+    '''
     return self._default_update_interval
     
   @default_update_interval.setter
@@ -135,6 +144,11 @@ class Scripter(View):
   
   @property
   def default_fps(self):
+    '''
+    The running rate for the update method. Frames per second is here considered to be just an
+    alternative way of setting the update interval, and this property is linked to
+    `default_update_interval` - change one and the other will change as well.
+    '''
     return self._default_fps
     
   @default_fps.setter
@@ -143,8 +157,20 @@ class Scripter(View):
     self._default_update_interval = 1/value
   
   def update(self):
-    ''' Run active steppers, remove finished ones,
-    activate next steppers. '''
+    '''
+    Main Scripter animation loop handler, called by the Puthonista UI loop and never by your
+    code directly.
+    
+    This method:
+      
+    * Activates all newly called scripts and suspends their parents.
+    * Calls all active scripts, which will run to their next `yield` or until completion.
+    * As a convenience feature, if a `yield` returns `'wait'` or a specific duration,
+    kicks off a child `timer` script to wait for that period of time.
+    * Cleans out completed scripts.
+    * Resumes parent scripts whose children have all completed.
+    * Sets `update_interval` to 0 if all scripts have completed.
+    '''
     for gen in self.activate:
       self.active_gens.add(gen)
     for gen in self.deactivate:
@@ -259,7 +285,7 @@ class Scripter(View):
       u = params
     return u[0]*(1-t)**3 + 3*u[1]*(1-t)**2*t + 3*u[2]*(1-t)*t**2 + u[3]*t**3
   
-#docgen: Primitives
+#docgen: Effect primitives
   
 @script
 def timer(view, duration, action=None):
@@ -340,7 +366,7 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
     dt = time.time() - start_time
   setattr(view, attribute, map_func(end_value))
 
-#docgen: Effects
+#docgen: Animation effects
 
 @script
 def slide_color(view, *args, **kwargs):

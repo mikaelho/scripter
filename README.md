@@ -34,12 +34,24 @@ See the API documentation for individual effects and how to roll your own with `
 
 _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 
+# API
+
+1. [Classes](#classes)
+  1. [Class: Scripter](#class-scripter)
+    1. [Methods](#methods)
+    1. [Properties](#properties)
+1. [Functions](#functions)
+  1. [Script management](#script-management)
+  1. [Effect primitives](#effect-primitives)
+  1. [Animation effects](#animation-effects)
+  1. [Additional easing functions](#additional-easing-functions)
+
+
 # Classes
 
 ## Class: Scripter
 
-Class that contains the update method used to run the scripts and to control their execution
-order.
+Class that contains the `update` method used to run the scripts and to control their execution.
 
 Runs at default 60 fps, or not at all when there are no scripts to run.
 
@@ -48,22 +60,20 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 ### Methods:
 
 
-#### `@property default_update_interval(self)`
-
-
-#### `@default_update_interval.setter default_update_interval(self, value)`
-
-
-#### `@property default_fps(self)`
-
-
-#### `@default_fps.setter default_fps(self, value)`
-
-
 #### ` update(self)`
 
-  Run active steppers, remove finished ones,
-  activate next steppers. 
+  Main Scripter animation loop handler, called by the Puthonista UI loop and never by your
+  code directly.
+  
+  This method:
+    
+  * Activates all newly called scripts and suspends their parents.
+  * Calls all active scripts, which will run to their next `yield` or until completion.
+  * As a convenience feature, if a `yield` returns `'wait'` or a specific duration,
+  kicks off a child `timer` script to wait for that period of time.
+  * Cleans out completed scripts.
+  * Resumes parent scripts whose children have all completed.
+  * Sets `update_interval` to 0 if all scripts have completed.
 
 #### ` pause_play_all(self)`
 
@@ -78,7 +88,15 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   Initializes all internal structures.
   Used at start and to cancel all running scripts.
-# Functions
+### Properties:
+
+
+#### `default_update_interval (get, set)`
+
+
+#### `default_fps (get, set)`
+
+### Functions:
 
 
 #### SCRIPT MANAGEMENT
@@ -87,6 +105,11 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   Decorator for the animation scripts. Scripts can be functions, methods or generators.
   
   First argument of decorated functions must always be the view to be animated.
+  
+  Calling a script starts the Scripter `update` loop, if not already running.
+  
+  New scripts suspend the execution of the parent script until all the parallel scripts have
+  completed, after which the `update` method will resume the execution of the parent script.
 
 #### ` find_scripter_instance(view)`
 
@@ -101,7 +124,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
   run them, you need to use this method first to find the right one.
 
-#### PRIMITIVES
+#### EFFECT PRIMITIVES
 #### `@script timer(view, duration, action=None)`
 
   Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
@@ -130,7 +153,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
   * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
 
-#### EFFECTS
+#### ANIMATION EFFECTS
 #### `@script slide_color(view, *args, **kwargs)`
 
   Slide a color value. Supports same
