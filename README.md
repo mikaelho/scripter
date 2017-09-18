@@ -48,64 +48,66 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 ### Methods:
 
 
-#### `default_update_interval(self)`
+#### `@property default_update_interval(self)`
 
 
-#### `default_update_interval(self, value)`
+#### `@default_update_interval.setter default_update_interval(self, value)`
 
 
-#### `default_fps(self)`
+#### `@property default_fps(self)`
 
 
-#### `default_fps(self, value)`
+#### `@default_fps.setter default_fps(self, value)`
 
 
-#### `update(self)`
+#### ` update(self)`
 
   Run active steppers, remove finished ones,
   activate next steppers. 
 
-#### `pause_play_all(self)`
+#### ` pause_play_all(self)`
 
   Pause or play all animations. 
 
-#### `cancel(self, script)`
+#### ` cancel(self, script)`
 
   Cancels any ongoing animations and
   sub-scripts for the given script. 
 
-#### `cancel_all(self)`
+#### ` cancel_all(self)`
 
   Initializes all internal structures.
   Used at start and to cancel all running scripts.
 # Functions
 
 
-#### `script(func)`
+#### SCRIPT MANAGEMENT
+#### ` script(func)`
 
   Decorator for the animation scripts. Scripts can be functions, methods or generators.
   
   First argument of decorated functions must always be the view to be animated.
 
-#### `find_scripter_instance(view)`
+#### ` find_scripter_instance(view)`
 
   Scripts need a "controller" ui.View that runs the update method for them. This function finds 
   or creates the controller for a view as follows:
     
-  * Check if the view itself is a Scripter
-  * Check if any of the subviews is a Scripter
-  * Repeat up the view hierarchy of superviews
-  * If not found, create as a hidden subview of the root view
+  1. Check if the view itself is a Scripter
+  2. Check if any of the subviews is a Scripter
+  3. Repeat 1 and 2 up the view hierarchy of superviews
+  4. If not found, create an instance of Scripter as a hidden subview of the root view
   
   If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
-  run then, you need to use this method first to find the right one.
+  run them, you need to use this method first to find the right one.
 
-#### `timer(view, duration, action=None)`
+#### PRIMITIVES
+#### `@script timer(view, duration, action=None)`
 
-  Acts as a wait timer. Optional action is
-  called every cycle. 
+  Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
+  controlling Scripter instance. Optional action function is called every cycle. 
 
-#### `set_value(view, attribute, value, func=None)`
+#### `@script set_value(view, attribute, value, func=None)`
 
   Generator that sets the `attribute` to a `value` once, or several times if the value itself is a 
   generator or an iterator.
@@ -113,16 +115,14 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   Optional keyword parameters:
   
   * `func` - called with the value, returns the actual value to be set
-  * `target` - object whose attribute is to be set. If not given, `self` is used. 
 
-#### `slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None)`
+#### `@script slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None)`
 
   Generator that "slides" the `value` of an
   `attribute` to an `end_value` in a given duration.
   
   Optional keyword parameters:
-    
-  * `target` - object whose attribute is to be set. If not given, `self` is used.
+  
   * `start_value` - set if you want some other value than the current value of the attribute as the animation start value.
   * `duration` - time it takes to change to the target value. Default is 0.5 seconds.
   * `delta_func` - use to transform the range from start_value to end_value to something else.
@@ -130,35 +130,41 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
   * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
 
-#### `slide_color(view, *args, **kwargs)`
+#### EFFECTS
+#### `@script slide_color(view, *args, **kwargs)`
 
   Slide a color value. Supports same
   arguments than slide_value. 
 
-#### `hide(view, **kwargs)`
+#### `@script hide(view, **kwargs)`
 
   Fade the view away, then set as hidden 
 
-#### `show(view, **kwargs)`
+#### `@script show(view, **kwargs)`
 
   Unhide view, then fade in. 
 
-#### `pulse(view, color='#67cf70')`
+#### `@script pulse(view, color='#67cf70')`
 
+  Pulses the background of the view to the given color and back to the original color.
+  Default color is a shade of green. 
 
-#### `move_to(view, x, y, **kwargs)`
+#### `@script move_to(view, x, y, **kwargs)`
 
-  Move to x, y 
+  Move to x, y. 
 
-#### `rotate(view, degrees, rps=1, start_value=0, **kwargs)`
+#### `@script rotate(view, degrees, rps=1, start_value=0, **kwargs)`
 
   Rotate view given degrees at given rps - rounds per second. Set start_value if not
   starting from 0. 
 
-#### `fly_out(view, direction, **kwargs)`
+#### `@script fly_out(view, direction, **kwargs)`
 
+  Moves the view out of the screen in the given direction. Direction is one of the
+  following strings: 'up', 'down', 'left', 'right'. 
 
-#### `drop_and_bounce(t)`
+#### ADDITIONAL EASING FUNCTIONS
+#### ` drop_and_bounce(t)`
 
   Not a script but an easing function simulating something that is dropped and
   bounces a few times. 

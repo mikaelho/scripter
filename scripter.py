@@ -1,19 +1,20 @@
 #coding: utf-8
 
 '''
-# _SCRIPTER_ - Pythonista UI animation framework
+# _SCRIPTER_ - Pythonista UI animations
 
 ![Logo](https://raw.githubusercontent.com/mikaelho/scripter/master/logo.jpg)
 
 # Quick start
 
-In order to start using the animation effects, just import scripter and use the effects like this:
+In order to start using the animation effects, just import scripter and call the effects as functions:
 
     from scripter import *
     
     hide(my_button)
     
-All effects expect an active UI view as the first argument.
+Effects expect an active UI view as the first argument. This can well be `self` or `sender` 
+where applicable.
 
 If you want to create a more complex animation from the effects provided, combine them in a
 script:
@@ -25,22 +26,16 @@ script:
       yield
       hide(my_button)
       
-Here movement and a red highlight happen at the same time. After both actions are completed, `my_button` fades away.
-
-If you want 'built-in' animations in your custom ui.View, you can inherit from Scripter instead, as it inherits from ui.View:
-  
-    class MyView(Scripter):
-      
-      @script
-      def my_script(self):
-        self.move_to(50, 200)
-        self.pulse('red')
-        yield
-        self.hide()
+Scripts control the order of execution with `yield` statements. Here movement and a red 
+pulsing highlight happen at the same time. After both actions are completed, `my_button` fades 
+away.
         
-See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
+Run scripter.py in Pythonista to see a demo of most of the available effects.
+        
+See the API documentation for individual effects and how to roll your own with `set_value`, 
+`slide_value` and `timer`.
 
-  _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
+_Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 '''
 
 from ui import *
@@ -48,6 +43,8 @@ from types import GeneratorType, SimpleNamespace
 from numbers import Number
 from functools import partial
 import time, math
+
+#docgen: Script management
 
 def script(func):
   '''
@@ -57,10 +54,10 @@ def script(func):
   '''
   
   def wrapper(view, *args, **kwargs):
-    scr = find_scripter_instance(view)      
     gen = func(view, *args, **kwargs)
     if not isinstance(gen, GeneratorType):
       return gen
+    scr = find_scripter_instance(view)
     scr.view_for_gen[gen] = view
     scr.parent_gens[gen] = scr.current_gen
     if scr.current_gen != 'root':
@@ -77,14 +74,16 @@ def script(func):
  
 def find_scripter_instance(view):
   '''
-  Scripts need a "controller" ui.View that runs the update method for them. This function finds or creates the controller for a view as follows:
-  
-    * Check if the view itself is a Scripter
-    * Check if any of the subviews is a Scripter
-    * Repeat up the view hierarchy of superviews
-    * If not found, create as a hidden subview of the root view
+  Scripts need a "controller" ui.View that runs the update method for them. This function finds 
+  or creates the controller for a view as follows:
     
-  if you want cancel or pause scripts, and have not explicitly created a Scripter instance to run then, you need to use this method first to find the right one.
+  1. Check if the view itself is a Scripter
+  2. Check if any of the subviews is a Scripter
+  3. Repeat 1 and 2 up the view hierarchy of superviews
+  4. If not found, create an instance of Scripter as a hidden subview of the root view
+  
+  If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
+  run them, you need to use this method first to find the right one.
   '''
   while view:
     if isinstance(view, Scripter):
@@ -238,9 +237,6 @@ class Scripter(View):
     self.deactivate = set()
     self.running = False
   
-  ''' Cubic function names and corresponding
-  parameters '''
-  
   @staticmethod
   def _cubic(params, t):
     ''' Cubic function for easing animations '''
@@ -263,12 +259,13 @@ class Scripter(View):
       u = params
     return u[0]*(1-t)**3 + 3*u[1]*(1-t)**2*t + 3*u[2]*(1-t)*t**2 + u[3]*t**3
   
-# Primitives
+#docgen: Primitives
   
 @script
 def timer(view, duration, action=None):
-  ''' Acts as a wait timer. Optional action is
-  called every cycle. '''
+  ''' Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
+  controlling Scripter instance. Optional action function is called every cycle. '''
+  
   scr = find_scripter_instance(view)
   start_time = time.time()
   dt = 0
@@ -281,16 +278,15 @@ def timer(view, duration, action=None):
   
 @script  
 def set_value(view, attribute, value, func=None):
-  ''' Generator that sets the `attribute` to a 
-  `value` once, or several times if the value 
-  itself is a generator.
+  '''
+  Generator that sets the `attribute` to a `value` once, or several times if the value itself is a 
+  generator or an iterator.
   
   Optional keyword parameters:
+  
+  * `func` - called with the value, returns the actual value to be set
+  '''
     
-    * func - called with the value, returns the actual value to be set
-    * target - object whose attribute is to be set. If not given, `self` is used. '''
-    
-  #target = target or self
   func = func if callable(func) else lambda val: val
   if isinstance(value, GeneratorType):
     while True:
@@ -306,18 +302,18 @@ def set_value(view, attribute, value, func=None):
 
 @script  
 def slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None):
-  ''' Generator that "slides" the `value` of an
+  '''
+  Generator that "slides" the `value` of an
   `attribute` to an `end_value` in a given duration.
   
   Optional keyword parameters:
-    
-    * `target` - object whose attribute is to be set. If not given, `self` is used.
-    * `start_value` - set if you want some other value than the current value of the attribute as the animation start value.
-    * `duration` - time it takes to change to the target value. Default is 0.5 seconds.
-    * `delta_func` - use to transform the range from start_value to end_value to something else.
-    * `ease_func` - provide to change delta-t value to something else. Mostly used for easing; you can provide an easing function name as a string instead of an actual function. See supported easing functions [here](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-functions.png).
-    * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
-    * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
+  
+  * `start_value` - set if you want some other value than the current value of the attribute as the animation start value.
+  * `duration` - time it takes to change to the target value. Default is 0.5 seconds.
+  * `delta_func` - use to transform the range from start_value to end_value to something else.
+  * `ease_func` - provide to change delta-t value to something else. Mostly used for easing; you can provide an easing function name as a string instead of an actual function. See supported easing functions [here](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-functions.png).
+  * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
+  * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
   '''
   scr = find_scripter_instance(view)
   duration = duration or scr.default_duration
@@ -344,8 +340,9 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
     dt = time.time() - start_time
   setattr(view, attribute, map_func(end_value))
 
-# Ready-made effects
+#docgen: Effects
 
+@script
 def slide_color(view, *args, **kwargs):
   ''' Slide a color value. Supports same
   arguments than slide_value. '''
@@ -377,6 +374,9 @@ def show(view, **kwargs):
 
 @script
 def pulse(view, color='#67cf70'):
+  ''' Pulses the background of the view to the given color and back to the original color.
+  Default color is a shade of green. '''
+  
   orig_color = view.background_color
   slide_color(view, 'background_color', color, ease_func='easeOut')
   yield
@@ -384,7 +384,7 @@ def pulse(view, color='#67cf70'):
 
 @script    
 def move_to(view, x, y, **kwargs):
-  ''' Move to x, y '''
+  ''' Move to x, y. '''
   slide_value(view, 'x', x, **kwargs)
   slide_value(view, 'y', y, **kwargs)
 
@@ -398,6 +398,9 @@ def rotate(view, degrees, rps=1, start_value=0, **kwargs):
   
 @script
 def fly_out(view, direction, **kwargs):
+  ''' Moves the view out of the screen in the given direction. Direction is one of the
+  following strings: 'up', 'down', 'left', 'right'. '''
+  
   (sw,sh) = get_screen_size()
   (lx, ly, lw, lh) = convert_rect(rect=(0,0,sw,sh), to_view=view)
   (x,y,w,h) = view.frame
@@ -407,6 +410,8 @@ def fly_out(view, direction, **kwargs):
   except KeyError:
     raise ValueError('Direction must be one of ' + str(list(targets.keys())))
   slide_value(view, target_coord[0], target_coord[1], ease_func='easeIn', **kwargs)
+
+#docgen: Additional easing functions
 
 def drop_and_bounce(t):
   ''' Not a script but an easing function simulating something that is dropped and
@@ -562,10 +567,11 @@ if __name__ == '__main__':
   v.add_subview(s)
   
   now_running = s.demo_script()
-  '''
+  scr = find_scripter_instance(s)
+  
   def pause_action(sender):
-    s.pause_play_all()
-    pause.title = 'Pause' if s.running else 'Play'
+    scr.pause_play_all()
+    pause.title = 'Pause' if scr.running else 'Play'
   
   pause = Button(title='Pause')
   pause.frame = (v.width-85, 60, 75, 40)
@@ -575,11 +581,11 @@ if __name__ == '__main__':
   v.add_subview(pause)
   
   def cancel_demo(sender):
-    s.cancel(now_running)
-    s.hide(view=pause)
-    s.hide(view=sender)
+    scr.cancel(now_running)
+    hide(pause)
+    hide(sender)
     # or could just use
-    # s.cancel_all()
+    # scr.cancel_all()
     # if clear that nothing else will be running
   
   b = Button(title='Cancel')
@@ -588,6 +594,3 @@ if __name__ == '__main__':
   b.tint_color = 'white'
   b.action = cancel_demo
   v.add_subview(b)
-  '''
-  
-  #animations.hide_or_reveal_view(c)
