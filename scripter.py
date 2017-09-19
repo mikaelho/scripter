@@ -21,7 +21,7 @@ script:
   
     @script
     def my_script():
-      move_to(my_button, 50, 200)
+      move(my_button, 50, 200)
       pulse(my_button, 'red')
       yield
       hide(my_button)
@@ -278,7 +278,7 @@ class Scripter(View):
     
     if isinstance(params, str):
       try:
-        u = _ease_func_params[params]
+        u = ease_func_params[params]
       except KeyError:
         raise ValueError('Easing function name must be one of the following: ' + ', '.join(list(ease_func_params)))
     else:
@@ -347,8 +347,8 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
   
   delta_func = delta_func if callable(delta_func) else lambda start_value, end_value: end_value - start_value
   map_func = map_func if callable(map_func) else lambda val: val
-  if ease_func in Scripter.ease_func_params:
-    ease_func = partial(Scripter.cubic, Scripter.ease_func_params[ease_func])
+  if isinstance(ease_func, str) or isinstance(ease_func, tuple):
+    ease_func = partial(Scripter._cubic, ease_func)
   else:
     ease_func = ease_func if callable(ease_func) else lambda val: val
   current_func = current_func if callable(current_func) else lambda start_value, t_fraction, delta_value: start_value + t_fraction * delta_value
@@ -409,7 +409,7 @@ def pulse(view, color='#67cf70'):
   slide_color(view, 'background_color', orig_color, ease_func='easeIn')
 
 @script    
-def move_to(view, x, y, **kwargs):
+def move(view, x, y, **kwargs):
   ''' Move to x, y. '''
   slide_value(view, 'x', x, **kwargs)
   slide_value(view, 'y', y, **kwargs)
@@ -437,15 +437,65 @@ def fly_out(view, direction, **kwargs):
     raise ValueError('Direction must be one of ' + str(list(targets.keys())))
   slide_value(view, target_coord[0], target_coord[1], ease_func='easeIn', **kwargs)
 
+@script
+def expand(view):
+  move(view, 0, 0)
+  slide_value(view, 'width', view.superview.width)
+  slide_value(view, 'height', view.superview.height)
+
+@script
+def fade_text(label, text, **kwargs):
+  '''
+  Special effect that fades one label into another. Assumes that the label has a transparent background and we can create and attach a copy of the label to its superview.
+  '''
+  temp_label = _copy_label(label)
+  temp_label.text = text
+  hide(label, **kwargs)
+  yield
+  show(temp_label, **kwargs)
+  yield
+  label.text = text
+  label.hidden = False
+  label.alpha = 1.0
+  label.superview.remove_subview(temp_label)
+  
+def _copy_label(label):
+  labl = Label(text=label.text, text_color=label.text_color, frame=label.frame, flex=label.flex, alignment=label.alignment, font=label.font, line_break_mode=label.line_break_mode, number_of_lines=label.number_of_lines)
+  labl.hidden = True
+  label.superview.add_subview(labl)
+  return labl
+
 #docgen: Additional easing functions
 
-def drop_and_bounce(t):
-  ''' Not a script but an easing function simulating something that is dropped and
-  bounces a few times. '''
-  pass
+def drop_and_bounce(t, bounces=2, energy_conserved=0.4):
+  '''
+  Easing function that can be used to simulate something that is dropped and bounces a few 
+  times.
+  
+  Optional arguments:
+    
+  * `bounces` - how many times the value bounces before settling at target
+  * `energy_conserved` - how high each bounce is compared to the previous bounce
+  '''
+  slices = 2 * bounces + 1
+  slice_duration = 1/slices
+  slice_specs = []
+  for s in range(slices):
+    if t <= (s + 1) * slice_duration:
+      slice_t = (t - s * slice_duration)/slice_duration
+      height = energy_conserved**(math.ceil(s/2))
+      if s % 2 == 0:
+        # Down
+        return (1-height) + Scripter._cubic('easeIn', slice_t) * height 
+      else:
+        # Up
+        return 1 - Scripter._cubic('easeOut', slice_t) * height 
+  return 1
 
 
 if __name__ == '__main__':
+  
+  import editor
   
   class DemoBackground(View):
     
@@ -455,6 +505,7 @@ if __name__ == '__main__':
       self.curve_point_x = None
       self.curve_point_y = None
       self.curve = []
+      self.hide_curve = False
     
     def draw(self):
       if self.axes_counter > 0:
@@ -486,8 +537,9 @@ if __name__ == '__main__':
         if self.curve_point_x is not None:
           self.curve.append((spx+self.curve_point_x, spy-self.curve_point_y))
           
-        for px, py in self.curve:
-          path.line_to(px, py)
+        if not self.hide_curve:
+          for px, py in self.curve:
+            path.line_to(px, py)
 
         path.stroke()
         
@@ -527,7 +579,7 @@ if __name__ == '__main__':
       pulse(self)
       yield
       yield 'wait'
-      move_to(self, 200, 200)
+      move(self, 200, 200)
       yield
       # Combine a primitive with a lambda and
       # target the contained Label instead of self
@@ -541,14 +593,15 @@ if __name__ == '__main__':
       slide_color(self.l, 'text_color', 'white', duration=2.0)
       yield
       yield 'wait'
-      self.l.text = 'Move two'
+      fade_text(self.l, 'Move two')
+      yield
       # Create another view and control it as well
       # Use another function to control animation
       # "tracks"
       self.other = View(background_color='red', frame=(10, 200, 150, 40))
       v.add_subview(self.other)
       self.sub_script()
-      move_to(self.other, 200, 300)
+      move(self.other, 200, 300)
       yield
       self.l.text = 'Custom'
       yield 'wait'
@@ -568,22 +621,41 @@ if __name__ == '__main__':
       slide_value(self, 'y', self.y-200, ease_func='easeInOutBounce', duration=2.0)
       yield
       yield 'wait'
-      self.l.text = 'Complete'
+      self.l.text = 'Bounce'
+      self.c.hidden = True
+      slide_color(self, 'background_color', 'green')
+      slide_color(self.l, 'text_color', 'white')
+      slide_value(self, 'width', 100)      
+      slide_value(self, 'height', 100)
+      slide_value(self, 'corner_radius', 50)
+      v.hide_curve = True
+      v.set_needs_display()
+      yield
+      slide_value(self, 'x', v.start_point.x, ease_func='easeOut', duration=2.0)
+      slide_value(self, 'y', v.start_point.y-self.height, ease_func=drop_and_bounce, duration=2.0)
+      yield
+      yield 1.0
+      self.l.text = 'Roll'
       timer(self, 2.0)
       yield
       v.axes_counter = 0
       v.set_needs_display()
       self.c.hidden = True
-      fly_out(self, 'down')
-      hide(self)
+      fly_out(self, 'right')
+      yield
+      expand(self)
+      slide_value(self, 'corner_radius', 0)
+      slide_color(self, 'background_color', 'white')
+      self.border_color = 'green'
+      self.border_width = 2
       yield 1.0
       hide(v)
   
     @script
     def sub_script(self):
-      move_to(self, 50, 200)
+      move(self, 50, 200)
       yield
-      move_to(self, 50, 300)        
+      move(self, 50, 300)        
       yield
       hide(self.other)
       yield
