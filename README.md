@@ -18,7 +18,7 @@ script:
   
     @script
     def my_script():
-      move_to(my_button, 50, 200)
+      move(my_button, 50, 200)
       pulse(my_button, 'red')
       yield
       hide(my_button)
@@ -41,7 +41,7 @@ _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 bet
   * [Properties](#properties)
 * [Functions](#functions)
   * [Script management](#script-management)
-  * [Effect primitives](#effect-primitives)
+  * [Animation primitives](#animation-primitives)
   * [Animation effects](#animation-effects)
   * [Additional easing functions](#additional-easing-functions)
 
@@ -121,7 +121,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
   run them, you need to use this method first to find the right one.
 
-#### EFFECT PRIMITIVES
+#### ANIMATION PRIMITIVES
 #### `@script timer(view, duration, action=None)`
 
   Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
@@ -150,12 +150,16 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
   * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
 
-#### ANIMATION EFFECTS
-#### `@script slide_color(view, *args, **kwargs)`
+#### `@script slide_tuple(view, *args, **kwargs)`
+
+  Slide a tuple value of arbitrary length. Supports same arguments as `slide_value`. 
+
+#### `@script slide_color(view, attribute, end_value, **kwargs)`
 
   Slide a color value. Supports same
-  arguments than slide_value. 
+  arguments than `slide_value`. 
 
+#### ANIMATION EFFECTS
 #### `@script hide(view, **kwargs)`
 
   Fade the view away, then set as hidden 
@@ -169,7 +173,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. 
 
-#### `@script move_to(view, x, y, **kwargs)`
+#### `@script move(view, x, y, **kwargs)`
 
   Move to x, y. 
 
@@ -183,8 +187,16 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   Moves the view out of the screen in the given direction. Direction is one of the
   following strings: 'up', 'down', 'left', 'right'. 
 
-#### ADDITIONAL EASING FUNCTIONS
-#### ` drop_and_bounce(t)`
+#### `@script expand(view)`
 
-  Not a script but an easing function simulating something that is dropped and
-  bounces a few times. 
+
+#### ADDITIONAL EASING FUNCTIONS
+#### ` drop_and_bounce(t, bounces=2, energy_conserved=0.4)`
+
+  Easing function that can be used to simulate something that is dropped and bounces a few 
+  times.
+  
+  Optional arguments:
+    
+  * `bounces` - how many times the value bounces before settling at target
+  * `energy_conserved` - how high each bounce is compared to the previous bounce

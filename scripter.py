@@ -285,7 +285,7 @@ class Scripter(View):
       u = params
     return u[0]*(1-t)**3 + 3*u[1]*(1-t)**2*t + 3*u[2]*(1-t)*t**2 + u[3]*t**3
   
-#docgen: Effect primitives
+#docgen: Animation primitives
   
 @script
 def timer(view, duration, action=None):
@@ -366,24 +366,31 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
     dt = time.time() - start_time
   setattr(view, attribute, map_func(end_value))
 
-#docgen: Animation effects
-
 @script
-def slide_color(view, *args, **kwargs):
-  ''' Slide a color value. Supports same
-  arguments than slide_value. '''
-  def delta_func_for_color(start_value, end_value):
-    start_color = parse_color(start_value)
-    end_color = parse_color(end_value)
-    return tuple((end_color[i] - start_color[i] for i in range(4)))
-  def current_func_for_color(start_value, t_fraction, delta_color):
-    start_color = parse_color(start_value)
-    return tuple((start_color[i] + t_fraction * delta_color[i] for i in range(4)))
+def slide_tuple(view, *args, **kwargs):
+  ''' Slide a tuple value of arbitrary length. Supports same arguments as `slide_value`. '''
+  def delta_func_for_tuple(start_value, end_value):
+    return tuple((end_value[i] - start_value[i] for i in range(len(start_value))))
+  def current_func_for_tuple(start_value, t_fraction, delta_value):
+    return tuple((start_value[i] + t_fraction * delta_value[i] for i in range(len(start_value))))
     
-  delta_func = delta_func_for_color if 'delta_func' not in kwargs else kwargs['delta_func']
-  current_func = current_func_for_color if 'current_func' not in kwargs else kwargs['current_func']
+  delta_func = delta_func_for_tuple if 'delta_func' not in kwargs else kwargs['delta_func']
+  current_func = current_func_for_tuple if 'current_func' not in kwargs else kwargs['current_func']
   
   return slide_value(view, *args, **kwargs, delta_func=delta_func, current_func=current_func)
+  
+@script
+def slide_color(view, attribute, end_value, **kwargs):
+  ''' Slide a color value. Supports same
+  arguments than `slide_value`. '''
+  start_value = kwargs.pop('start_value', None)
+  if start_value:
+    start_value = parse_color(start_value)
+  end_value = parse_color(end_value)
+  
+  return slide_tuple(view, attribute, end_value, start_value=start_value, **kwargs)
+
+#docgen: Animation effects
 
 @script
 def hide(view, **kwargs):
@@ -395,6 +402,7 @@ def hide(view, **kwargs):
 @script 
 def show(view, **kwargs):
   ''' Unhide view, then fade in. '''
+  view.alpha = 0.0
   view.hidden = False
   slide_value(view, 'alpha', 1.0, **kwargs)
 
@@ -442,28 +450,7 @@ def expand(view):
   move(view, 0, 0)
   slide_value(view, 'width', view.superview.width)
   slide_value(view, 'height', view.superview.height)
-
-@script
-def fade_text(label, text, **kwargs):
-  '''
-  Special effect that fades one label into another. Assumes that the label has a transparent background and we can create and attach a copy of the label to its superview.
-  '''
-  temp_label = _copy_label(label)
-  temp_label.text = text
-  hide(label, **kwargs)
-  yield
-  show(temp_label, **kwargs)
-  yield
-  label.text = text
-  label.hidden = False
-  label.alpha = 1.0
-  label.superview.remove_subview(temp_label)
   
-def _copy_label(label):
-  labl = Label(text=label.text, text_color=label.text_color, frame=label.frame, flex=label.flex, alignment=label.alignment, font=label.font, line_break_mode=label.line_break_mode, number_of_lines=label.number_of_lines)
-  labl.hidden = True
-  label.superview.add_subview(labl)
-  return labl
 
 #docgen: Additional easing functions
 
@@ -549,7 +536,7 @@ if __name__ == '__main__':
   
   v = DemoBackground()
   v.background_color = 'white'
-  v.present('sheet')
+  v.present('full_screen')
   
   class Demo(View):
     
@@ -569,12 +556,17 @@ if __name__ == '__main__':
       self.add_subview(c)
       self.add_subview(l)
       l.frame = self.bounds
-      
+      self.tv = tv = TextView(background_color='white')
+      tv.text = editor.get_text()
+      tv.text_color = '#4a4a4a'
+      tv.frame = (2, 2, 146, 36)
+      tv.flex = 'WH'
+      tv.hidden = True
+      self.add_subview(tv)
       self.hidden = True
       
     @script
     def demo_script(self):
-      # Convenience function to hide the view
       show(self)
       pulse(self)
       yield
@@ -593,15 +585,14 @@ if __name__ == '__main__':
       slide_color(self.l, 'text_color', 'white', duration=2.0)
       yield
       yield 'wait'
-      fade_text(self.l, 'Move two')
-      yield
+      self.l.text = 'Move two'
       # Create another view and control it as well
       # Use another function to control animation
       # "tracks"
       self.other = View(background_color='red', frame=(10, 200, 150, 40))
       v.add_subview(self.other)
       self.sub_script()
-      move(self.other, 200, 300)
+      move(self.other, 200, 400)
       yield
       self.l.text = 'Custom'
       yield 'wait'
@@ -625,9 +616,9 @@ if __name__ == '__main__':
       self.c.hidden = True
       slide_color(self, 'background_color', 'green')
       slide_color(self.l, 'text_color', 'white')
-      slide_value(self, 'width', 100)      
-      slide_value(self, 'height', 100)
-      slide_value(self, 'corner_radius', 50)
+      slide_value(self, 'width', 76)      
+      slide_value(self, 'height', 76)
+      slide_value(self, 'corner_radius', 38)
       v.hide_curve = True
       v.set_needs_display()
       yield
@@ -635,31 +626,37 @@ if __name__ == '__main__':
       slide_value(self, 'y', v.start_point.y-self.height, ease_func=drop_and_bounce, duration=2.0)
       yield
       yield 1.0
-      self.l.text = 'Roll'
-      timer(self, 2.0)
-      yield
       v.axes_counter = 0
       v.set_needs_display()
       self.c.hidden = True
-      fly_out(self, 'right')
-      yield
       expand(self)
       slide_value(self, 'corner_radius', 0)
       slide_color(self, 'background_color', 'white')
-      self.border_color = 'green'
-      self.border_width = 2
+      #self.border_color = 'green'
+      #self.border_width = 2
+      show(self.tv)
+      slide_tuple(self.tv, 'content_offset', (0,0))
+      yield
       yield 1.0
-      hide(v)
+      slide_tuple(self.tv, 'content_offset', (0, self.tv.content_size[1]), duration=20)
+      self.end_fade()
   
     @script
     def sub_script(self):
       move(self, 50, 200)
       yield
-      move(self, 50, 300)        
+      move(self, 50, 400)        
       yield
       hide(self.other)
+      fly_out(self.other, 'down')
       yield
       v.remove_subview(self.other)
+      
+    @script
+    def end_fade(self):
+      yield 7.0
+      hide(v)
+      
   
   s = Demo()
   v.add_subview(s)
