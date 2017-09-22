@@ -168,7 +168,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   Unhide view, then fade in. 
 
-#### `@script pulse(view, color='#67cf70')`
+#### `@script pulse(view, color='#67cf70', **kwargs)`
 
   Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. 
@@ -191,6 +191,10 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
 
 #### ADDITIONAL EASING FUNCTIONS
+#### ` jump(t)`
+
+  Ease out "up" to 1, ease in back "down" to zero. 
+
 #### ` drop_and_bounce(t, bounces=2, energy_conserved=0.4)`
 
   Easing function that can be used to simulate something that is dropped and bounces a few 

@@ -356,15 +356,19 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
   delta_value = delta_func(start_value, end_value)
   start_time = time.time()
   dt = 0
-  while dt < duration:
-    t_fraction = ease_func(dt/duration)
+  scaling = True
+  while scaling:
+    if dt < duration:
+      t_fraction = ease_func(dt/duration)
+    else:
+      t_fraction = ease_func(1)
+      scaling = False
     current_value = current_func(start_value, t_fraction, delta_value)
     setattr(view, attribute, map_func(current_value))
     yield
     if scr.time_paused > 0:
       start_time += scr.time_paused
     dt = time.time() - start_time
-  setattr(view, attribute, map_func(end_value))
 
 @script
 def slide_tuple(view, *args, **kwargs):
@@ -407,14 +411,17 @@ def show(view, **kwargs):
   slide_value(view, 'alpha', 1.0, **kwargs)
 
 @script
-def pulse(view, color='#67cf70'):
+def pulse(view, color='#67cf70', **kwargs):
   ''' Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. '''
+  slide_color(view, 'background_color', color, ease_func=jump, **kwargs)
   
+  '''
   orig_color = view.background_color
   slide_color(view, 'background_color', color, ease_func='easeOut')
   yield
   slide_color(view, 'background_color', orig_color, ease_func='easeIn')
+  '''
 
 @script    
 def move(view, x, y, **kwargs):
@@ -453,6 +460,16 @@ def expand(view):
   
 
 #docgen: Additional easing functions
+
+def jump(t):
+  ''' Ease out "up" to 1, ease in back "down" to zero. '''
+  if t < 0.5:
+    t /= 0.5
+    return Scripter._cubic('easeOut', t)
+  else:
+    t -= 0.5
+    t /= 0.5
+    return Scripter._cubic('easeIn', 1-t)
 
 def drop_and_bounce(t, bounces=2, energy_conserved=0.4):
   '''
@@ -568,7 +585,7 @@ if __name__ == '__main__':
     @script
     def demo_script(self):
       show(self)
-      pulse(self)
+      pulse(self, duration=1.0)
       yield
       yield 'wait'
       move(self, 200, 200)
