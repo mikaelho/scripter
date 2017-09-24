@@ -39,6 +39,8 @@ _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 bet
 '''
 
 from ui import *
+import scene_drawing
+
 from types import GeneratorType, SimpleNamespace
 from numbers import Number
 from functools import partial
@@ -179,18 +181,22 @@ class Scripter(View):
     self.deactivate = set()
     gen_to_end = []
     for gen in self.active_gens:
-      wait_time = None
-      try:
-        self.current_gen = gen
-        wait_time = next(gen)
-      except StopIteration:
-        if gen not in self.deactivate:
-          gen_to_end.append(gen)
+      self.current_gen = gen
+      wait_time = self.should_wait.pop(gen, None)
       if wait_time is not None:
-        if wait_time == 'wait':
-          wait_time = self.default_duration
-        if isinstance(wait_time, Number):
-          timer(self.view_for_gen[gen], wait_time)
+        timer(self.view_for_gen[gen], wait_time)
+      else:
+        wait_time = None
+        try:
+          wait_time = next(gen)
+        except StopIteration:
+          if gen not in self.deactivate:
+            gen_to_end.append(gen)
+        if wait_time is not None:
+          if wait_time == 'wait':
+            wait_time = self.default_duration
+          if isinstance(wait_time, Number):
+            self.should_wait[gen] = wait_time
     self.current_gen = 'root'
     self.time_paused = 0
     for gen in gen_to_end:
@@ -256,6 +262,7 @@ class Scripter(View):
     '''
     self.current_gen = 'root'
     self.view_for_gen = {}
+    self.should_wait = {}
     self.parent_gens = {}
     self.active_gens = set()
     self.standby_gens = {}
@@ -265,7 +272,14 @@ class Scripter(View):
   
   @staticmethod
   def _cubic(params, t):
-    ''' Cubic function for easing animations '''
+    '''
+    Cubic function for easing animations.
+    
+    Arguments:
+      
+    * params - either a 4-tuple of cubic parameters, one of the parameter names below (like ’easeIn') or 'linear' for a straight line
+    * t - time running from 0 to 1
+    '''
     ease_func_params = {
       'easeIn': (0, 0.05, 0.25, 1),
       'easeOut': (0, 0.75, 0.95, 1),
@@ -277,6 +291,8 @@ class Scripter(View):
     }
     
     if isinstance(params, str):
+      if params == 'linear':
+        return t
       try:
         u = ease_func_params[params]
       except KeyError:
@@ -284,6 +300,7 @@ class Scripter(View):
     else:
       u = params
     return u[0]*(1-t)**3 + 3*u[1]*(1-t)**2*t + 3*u[2]*(1-t)*t**2 + u[3]*t**3
+
   
 #docgen: Animation primitives
   
@@ -360,6 +377,7 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
   while scaling:
     if dt < duration:
       t_fraction = ease_func(dt/duration)
+      #print(ease_func.__name__, t_fraction)
     else:
       t_fraction = ease_func(1)
       scaling = False
@@ -414,7 +432,7 @@ def show(view, **kwargs):
 def pulse(view, color='#67cf70', **kwargs):
   ''' Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. '''
-  slide_color(view, 'background_color', color, ease_func=jump, **kwargs)
+  slide_color(view, 'background_color', color, ease_func=bell, **kwargs)
   
   '''
   orig_color = view.background_color
@@ -459,17 +477,43 @@ def expand(view):
   slide_value(view, 'height', view.superview.height)
   
 
-#docgen: Additional easing functions
+#docgen: Easing functions
 
-def jump(t):
-  ''' Ease out "up" to 1, ease in back "down" to zero. '''
+def linear(t): return t
+def sinusoidal(t): return scene_drawing.curve_sinodial(t)
+def ease_in(t): return scene_drawing.curve_ease_in(t)
+def ease_out(t): return scene_drawing.curve_ease_out
+def ease_in_out(t): return scene_drawing.curve_ease_in_out(t)
+def elastic_out(t): return scene_drawing.curve_elastic_out(t)
+def elastic_in(t): return scene_drawing.curve_elastic_in(t)
+def elastic_in_out(t): return scene_drawing.curve_elastic_in_out(t)
+def bounce_out(t): return scene_drawing.curve_bounce_out(t)
+def bounce_in(t): return scene_drawing.curve_bounce_in(t)
+def bounce_in_out(t): return scene_drawing.curve_bounce_in_out(t)
+def ease_back_in(t): return scene_drawing.curve_ease_back_in(t)
+def ease_back_out(t): return scene_drawing.curve_ease_back_out(t)
+def ease_back_in_out(t): return scene_drawing.curve_ease_back_in_out(t)
+
+def mirror(t, ease_func=linear):
+  ''' Runs the given easing function to the end in half the duration, then backwards in the second half. '''
+  ease_func = ease_func if callable(ease_func) else partial(Scripter._cubic, ease_func)
   if t < 0.5:
     t /= 0.5
-    return Scripter._cubic('easeOut', t)
+    return ease_func(t)
   else:
     t -= 0.5
     t /= 0.5
-    return Scripter._cubic('easeIn', 1-t)
+    return ease_func(1-t)
+
+def arc(t):
+  ''' Ease out "up" to 1, ease in back "down" to zero. '''
+  return mirror(t, ease_out)
+  
+def bell(t):
+  return mirror(t, ease_in_out)
+  
+def spike(t):
+  return mirror(t, ease_in)
 
 def drop_and_bounce(t, bounces=2, energy_conserved=0.4):
   '''
@@ -499,7 +543,7 @@ def drop_and_bounce(t, bounces=2, energy_conserved=0.4):
 
 if __name__ == '__main__':
   
-  import editor
+  import editor, scene_drawing
   
   class DemoBackground(View):
     
@@ -586,21 +630,18 @@ if __name__ == '__main__':
     def demo_script(self):
       show(self)
       pulse(self, duration=1.0)
-      yield
       yield 'wait'
       move(self, 200, 200)
       yield
       # Combine a primitive with a lambda and
       # target the contained Label instead of self
       set_value(self.l, 'text', range(1, 101), lambda count: f'Count: {count}')
-      yield
-      yield 'wait'
+      yield 1
       # Transformations
       self.l.text = 'Rotating'
-      rotate(self, 720, ease_func='easeInOutBounce')
+      rotate(self, 720, ease_func=ease_back_in_out)
       slide_color(self, 'background_color', 'green', duration=2.0)
       slide_color(self.l, 'text_color', 'white', duration=2.0)
-      yield
       yield 'wait'
       self.l.text = 'Move two'
       # Create another view and control it as well
@@ -610,25 +651,24 @@ if __name__ == '__main__':
       v.add_subview(self.other)
       self.sub_script()
       move(self.other, 200, 400)
-      yield
-      self.l.text = 'Custom'
       yield 'wait'
+      
+      self.l.text = 'Custom'
       # Driving custom View.draw animation
       self.c.hidden = False
       slide_color(self, 'background_color', 'transparent')
       slide_color(self.l, 'text_color', 'black')
       v.start_point = SimpleNamespace(x=self.x+15, y=self.y+20)
       set_value(v, 'axes_counter', range(1, 210, 3), func=v.trigger_refresh)
-      yield
       yield 'wait'
       slide_value(v, 'curve_point_x', 200, start_value=1, duration=2.0)
-      slide_value(v, 'curve_point_y', 200, start_value=1, ease_func='easeInOutBounce', map_func=v.trigger_refresh, duration=2.0)
-      yield
+      slide_value(v, 'curve_point_y', 200, start_value=1, ease_func=ease_back_in_out, map_func=v.trigger_refresh, duration=2.0)
       yield 'wait'
+      
       slide_value(self, 'x', self.x+200, duration=2.0)
-      slide_value(self, 'y', self.y-200, ease_func='easeInOutBounce', duration=2.0)
-      yield
+      slide_value(self, 'y', self.y-200, ease_func=ease_back_in_out, duration=2.0)
       yield 'wait'
+      
       self.l.text = 'Bounce'
       self.c.hidden = True
       slide_color(self, 'background_color', 'green')
@@ -640,9 +680,9 @@ if __name__ == '__main__':
       v.set_needs_display()
       yield
       slide_value(self, 'x', v.start_point.x, ease_func='easeOut', duration=2.0)
-      slide_value(self, 'y', v.start_point.y-self.height, ease_func=drop_and_bounce, duration=2.0)
-      yield
+      slide_value(self, 'y', v.start_point.y-self.height, ease_func=scene_drawing.curve_bounce_out, duration=2.0)
       yield 1.0
+      
       v.axes_counter = 0
       v.set_needs_display()
       self.c.hidden = True
@@ -653,8 +693,8 @@ if __name__ == '__main__':
       #self.border_width = 2
       show(self.tv)
       slide_tuple(self.tv, 'content_offset', (0,0))
-      yield
       yield 1.0
+      
       slide_tuple(self.tv, 'content_offset', (0, self.tv.content_size[1]), duration=20)
       self.end_fade()
   
