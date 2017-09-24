@@ -10,27 +10,30 @@ In order to start using the animation effects, just import scripter and call the
     
     hide(my_button)
     
-Effects expect an active UI view as the first argument. This can well be `self` or `sender` 
-where applicable.
+Effects expect an active UI view as the first argument. This can be `self` or `sender`, where applicable. Effects like this run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
 
-If you want to create a more complex animation from the effects provided, combine them in a
-script:
+If you want to create a more complex animation from the effects provided, combine them in a script:
   
     @script
     def my_script():
       move(my_button, 50, 200)
       pulse(my_button, 'red')
       yield
-      hide(my_button)
+      hide(my_button, duration=2.0)
       
-Scripts control the order of execution with `yield` statements. Here movement and a red 
-pulsing highlight happen at the same time. After both actions are completed, `my_button` fades 
-away.
+Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, `my_button` slowly fades away', in 2 seconds.
+
+As small delays are often needed for natural-feeling animations, you can append a number after a `yield` statement, to suspend the execution of the script for that duration, or `yield 'wait'` for the default duration.
+
+Another key for good animations is the use of easing functions that modify how a value is changed from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
+  
+    slide_value(view, 'x', 200, ease_func=curve_bounce_out)
+    
+See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/scene_drawing%20ease%20funcs.jpg) to pick the right function.
         
 Run scripter.py in Pythonista to see a demo of most of the available effects.
         
-See the API documentation for individual effects and how to roll your own with `set_value`, 
-`slide_value` and `timer`.
+See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
 
 _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 
@@ -43,7 +46,7 @@ _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 bet
   * [Script management](#script-management)
   * [Animation primitives](#animation-primitives)
   * [Animation effects](#animation-effects)
-  * [Additional easing functions](#additional-easing-functions)
+  * [Easing functions](#easing-functions)
 
 
 ## Class: Scripter
@@ -190,17 +193,49 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 #### `@script expand(view)`
 
 
-#### ADDITIONAL EASING FUNCTIONS
-#### ` jump(t)`
+#### EASING FUNCTIONS
+#### ` linear(t)`
 
-  Ease out "up" to 1, ease in back "down" to zero. 
 
-#### ` drop_and_bounce(t, bounces=2, energy_conserved=0.4)`
+#### ` sinusoidal(t)`
 
-  Easing function that can be used to simulate something that is dropped and bounces a few 
-  times.
-  
-  Optional arguments:
-    
-  * `bounces` - how many times the value bounces before settling at target
-  * `energy_conserved` - how high each bounce is compared to the previous bounce
+
+#### ` ease_in(t)`
+
+
+#### ` ease_out(t)`
+
+
+#### ` ease_in_out(t)`
+
+
+#### ` elastic_out(t)`
+
+
+#### ` elastic_in(t)`
+
+
+#### ` elastic_in_out(t)`
+
+
+#### ` bounce_out(t)`
+
+
+#### ` bounce_in(t)`
+
+
+#### ` bounce_in_out(t)`
+
+
+#### ` ease_back_in(t)`
+
+
+#### ` ease_back_out(t)`
+
+
+#### ` ease_back_in_out(t)`
+
+
+#### ` mirror(ease_func, t)`
+
+  Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".

@@ -13,27 +13,30 @@ In order to start using the animation effects, just import scripter and call the
     
     hide(my_button)
     
-Effects expect an active UI view as the first argument. This can well be `self` or `sender` 
-where applicable.
+Effects expect an active UI view as the first argument. This can be `self` or `sender`, where applicable. Effects like this run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
 
-If you want to create a more complex animation from the effects provided, combine them in a
-script:
+If you want to create a more complex animation from the effects provided, combine them in a script:
   
     @script
     def my_script():
       move(my_button, 50, 200)
       pulse(my_button, 'red')
       yield
-      hide(my_button)
+      hide(my_button, duration=2.0)
       
-Scripts control the order of execution with `yield` statements. Here movement and a red 
-pulsing highlight happen at the same time. After both actions are completed, `my_button` fades 
-away.
+Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, `my_button` slowly fades away', in 2 seconds.
+
+As small delays are often needed for natural-feeling animations, you can append a number after a `yield` statement, to suspend the execution of the script for that duration, or `yield 'wait'` for the default duration.
+
+Another key for good animations is the use of easing functions that modify how a value is changed from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
+  
+    slide_value(view, 'x', 200, ease_func=curve_bounce_out)
+    
+See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/scene_drawing%20ease%20funcs.jpg) to pick the right function.
         
 Run scripter.py in Pythonista to see a demo of most of the available effects.
         
-See the API documentation for individual effects and how to roll your own with `set_value`, 
-`slide_value` and `timer`.
+See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
 
 _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 '''
@@ -432,7 +435,8 @@ def show(view, **kwargs):
 def pulse(view, color='#67cf70', **kwargs):
   ''' Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. '''
-  slide_color(view, 'background_color', color, ease_func=bell, **kwargs)
+  ease_func = partial(mirror, ease_in)
+  slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
   
   '''
   orig_color = view.background_color
@@ -479,23 +483,37 @@ def expand(view):
 
 #docgen: Easing functions
 
-def linear(t): return t
-def sinusoidal(t): return scene_drawing.curve_sinodial(t)
-def ease_in(t): return scene_drawing.curve_ease_in(t)
-def ease_out(t): return scene_drawing.curve_ease_out
-def ease_in_out(t): return scene_drawing.curve_ease_in_out(t)
-def elastic_out(t): return scene_drawing.curve_elastic_out(t)
-def elastic_in(t): return scene_drawing.curve_elastic_in(t)
-def elastic_in_out(t): return scene_drawing.curve_elastic_in_out(t)
-def bounce_out(t): return scene_drawing.curve_bounce_out(t)
-def bounce_in(t): return scene_drawing.curve_bounce_in(t)
-def bounce_in_out(t): return scene_drawing.curve_bounce_in_out(t)
-def ease_back_in(t): return scene_drawing.curve_ease_back_in(t)
-def ease_back_out(t): return scene_drawing.curve_ease_back_out(t)
-def ease_back_in_out(t): return scene_drawing.curve_ease_back_in_out(t)
+def linear(t):
+  return t 
+def sinusoidal(t):
+  return scene_drawing.curve_sinodial(t)
+def ease_in(t):
+  return scene_drawing.curve_ease_in(t)
+def ease_out(t):
+  return scene_drawing.curve_ease_out
+def ease_in_out(t):
+  return scene_drawing.curve_ease_in_out(t)
+def elastic_out(t):
+  return scene_drawing.curve_elastic_out(t)
+def elastic_in(t):
+  return scene_drawing.curve_elastic_in(t)
+def elastic_in_out(t):
+  return scene_drawing.curve_elastic_in_out(t)
+def bounce_out(t):
+  return scene_drawing.curve_bounce_out(t)
+def bounce_in(t):
+  return scene_drawing.curve_bounce_in(t)
+def bounce_in_out(t):
+  return scene_drawing.curve_bounce_in_out(t)
+def ease_back_in(t):
+  return scene_drawing.curve_ease_back_in(t)
+def ease_back_out(t):
+  return scene_drawing.curve_ease_back_out(t)
+def ease_back_in_out(t):
+  return scene_drawing.curve_ease_back_in_out(t)
 
-def mirror(t, ease_func=linear):
-  ''' Runs the given easing function to the end in half the duration, then backwards in the second half. '''
+def mirror(ease_func, t):
+  ''' Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".'''
   ease_func = ease_func if callable(ease_func) else partial(Scripter._cubic, ease_func)
   if t < 0.5:
     t /= 0.5
@@ -504,41 +522,6 @@ def mirror(t, ease_func=linear):
     t -= 0.5
     t /= 0.5
     return ease_func(1-t)
-
-def arc(t):
-  ''' Ease out "up" to 1, ease in back "down" to zero. '''
-  return mirror(t, ease_out)
-  
-def bell(t):
-  return mirror(t, ease_in_out)
-  
-def spike(t):
-  return mirror(t, ease_in)
-
-def drop_and_bounce(t, bounces=2, energy_conserved=0.4):
-  '''
-  Easing function that can be used to simulate something that is dropped and bounces a few 
-  times.
-  
-  Optional arguments:
-    
-  * `bounces` - how many times the value bounces before settling at target
-  * `energy_conserved` - how high each bounce is compared to the previous bounce
-  '''
-  slices = 2 * bounces + 1
-  slice_duration = 1/slices
-  slice_specs = []
-  for s in range(slices):
-    if t <= (s + 1) * slice_duration:
-      slice_t = (t - s * slice_duration)/slice_duration
-      height = energy_conserved**(math.ceil(s/2))
-      if s % 2 == 0:
-        # Down
-        return (1-height) + Scripter._cubic('easeIn', slice_t) * height 
-      else:
-        # Up
-        return 1 - Scripter._cubic('easeOut', slice_t) * height 
-  return 1
 
 
 if __name__ == '__main__':
