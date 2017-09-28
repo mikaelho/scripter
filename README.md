@@ -139,7 +139,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   
   * `func` - called with the value, returns the actual value to be set
 
-#### `@script slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None)`
+#### `@script slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None, side_func=None)`
 
   Generator that "slides" the `value` of an
   `attribute` to an `end_value` in a given duration.
@@ -152,6 +152,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   * `ease_func` - provide to change delta-t value to something else. Mostly used for easing; you can provide an easing function name as a string instead of an actual function. See supported easing functions [here](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-functions.png).
   * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
   * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
+  * `side_func` - Called without arguments each time after the main value has been set. Useful for side effects.
 
 #### `@script slide_tuple(view, *args, **kwargs)`
 
@@ -180,18 +181,22 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   Move to x, y. 
 
-#### `@script rotate(view, degrees, rps=1, start_value=0, **kwargs)`
+#### `@script rotate(view, degrees, **kwargs)`
 
-  Rotate view given degrees at given rps - rounds per second. Set start_value if not
-  starting from 0. 
+  Rotate view given degrees. Set start_value if not starting from 0. 
+
+#### `@script scale(view, factor, **kwargs)`
+
+  Scale view by a given factor in both x and y dimensions. Set start_value if not starting from 1. 
 
 #### `@script fly_out(view, direction, **kwargs)`
 
   Moves the view out of the screen in the given direction. Direction is one of the
   following strings: 'up', 'down', 'left', 'right'. 
 
-#### `@script expand(view)`
+#### `@script expand(view, **kwargs)`
 
+  Expands the view to fill all of its superview. 
 
 #### EASING FUNCTIONS
 #### ` linear(t)`

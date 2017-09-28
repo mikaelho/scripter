@@ -316,7 +316,7 @@ def timer(view, duration, action=None):
   start_time = time.time()
   dt = 0
   while dt < duration:
-    if action: action(dt)
+    if action: action()
     yield
     if scr.time_paused > 0:
       start_time += scr.time_paused
@@ -347,7 +347,7 @@ def set_value(view, attribute, value, func=None):
     setattr(view, attribute, func(value))
 
 @script  
-def slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None):
+def slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None, side_func=None):
   '''
   Generator that "slides" the `value` of an
   `attribute` to an `end_value` in a given duration.
@@ -360,6 +360,7 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
   * `ease_func` - provide to change delta-t value to something else. Mostly used for easing; you can provide an easing function name as a string instead of an actual function. See supported easing functions [here](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-functions.png).
   * `current_func` - Given the start value, delta value and progress fraction (from 0 to 1), returns the current value. Intended to be used to manage more exotic values like colors.
   * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
+  * `side_func` - Called without arguments each time after the main value has been set. Useful for side effects.
   '''
   scr = find_scripter_instance(view)
   duration = duration or scr.default_duration
@@ -386,6 +387,7 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
       scaling = False
     current_value = current_func(start_value, t_fraction, delta_value)
     setattr(view, attribute, map_func(current_value))
+    if side_func: side_func()
     yield
     if scr.time_paused > 0:
       start_time += scr.time_paused
@@ -452,12 +454,17 @@ def move(view, x, y, **kwargs):
   slide_value(view, 'y', y, **kwargs)
 
 @script    
-def rotate(view, degrees, rps=1, start_value=0, **kwargs):
-  ''' Rotate view given degrees at given rps - rounds per second. Set start_value if not
-  starting from 0. '''
-  duration = degrees / (rps * 360)
+def rotate(view, degrees, **kwargs):
+  ''' Rotate view given degrees. Set start_value if not starting from 0. '''
+  start_value = kwargs.pop('start_value', 0)
   radians = degrees/360*2*math.pi
-  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r), duration=duration, **kwargs)
+  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r), **kwargs)
+  
+@script    
+def scale(view, factor, **kwargs):
+  ''' Scale view by a given factor in both x and y dimensions. Set start_value if not starting from 1. '''
+  start_value = kwargs.pop('start_value', 1)
+  slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
   
 @script
 def fly_out(view, direction, **kwargs):
@@ -475,10 +482,11 @@ def fly_out(view, direction, **kwargs):
   slide_value(view, target_coord[0], target_coord[1], ease_func='easeIn', **kwargs)
 
 @script
-def expand(view):
-  move(view, 0, 0)
-  slide_value(view, 'width', view.superview.width)
-  slide_value(view, 'height', view.superview.height)
+def expand(view, **kwargs):
+  ''' Expands the view to fill all of its superview. '''
+  move(view, 0, 0, **kwargs)
+  slide_value(view, 'width', view.superview.width, **kwargs)
+  slide_value(view, 'height', view.superview.height, **kwargs)
   
 
 #docgen: Easing functions
@@ -490,7 +498,7 @@ def sinusoidal(t):
 def ease_in(t):
   return scene_drawing.curve_ease_in(t)
 def ease_out(t):
-  return scene_drawing.curve_ease_out
+  return scene_drawing.curve_ease_out(t)
 def ease_in_out(t):
   return scene_drawing.curve_ease_in_out(t)
 def elastic_out(t):
