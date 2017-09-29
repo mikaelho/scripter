@@ -32,9 +32,7 @@ Another key for good animations is the use of easing functions that modify how a
   
     slide_value(view, 'x', 200, ease_func=bounce_out)
     
-See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function.
-        
-Run scripter.py in Pythonista to see a demo of most of the available effects.
+See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function, or run `scripter-demo.py` to try out the available effects and to find the optimal duration and easing function combo for your purposes.
         
 See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
 
