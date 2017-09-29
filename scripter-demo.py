@@ -195,7 +195,7 @@ if __name__ == '__main__':
     
   duration_slider.action = slider_action
   
-  ease_funcs = [ linear, sinusoidal, ease_in, ease_out, ease_in_out, elastic_out, elastic_in,  elastic_in_out, bounce_out, bounce_in, bounce_in_out, ease_back_in, ease_back_out, ease_back_in_out ]
+  ease_funcs = [ linear, sinusoidal, ease_in, ease_out, ease_in_out, ease_out_in, elastic_out, elastic_in,  elastic_in_out, bounce_out, bounce_in, bounce_in_out, ease_back_in, ease_back_in_alt, ease_back_out, ease_back_out_alt, ease_back_in_out, ease_back_in_out_alt ]
   
   ease_label = Label(text='linear', frame=(200, 20, 150, 40), touch_enabled=True, corner_radius=7, border_color='black', border_width=2, alignment=ALIGN_CENTER)
   ease_click = Button(frame=(0, 0, 150, 40), flex='WH')

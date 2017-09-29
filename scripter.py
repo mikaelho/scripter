@@ -515,6 +515,8 @@ def ease_out(t):
   return scene_drawing.curve_ease_out(t)
 def ease_in_out(t):
   return scene_drawing.curve_ease_in_out(t)
+def ease_out_in(t):
+  return Scripter._cubic('easeOutIn', t)
 def elastic_out(t):
   return scene_drawing.curve_elastic_out(t)
 def elastic_in(t):
@@ -529,10 +531,16 @@ def bounce_in_out(t):
   return scene_drawing.curve_bounce_in_out(t)
 def ease_back_in(t):
   return scene_drawing.curve_ease_back_in(t)
+def ease_back_in_alt(t):
+  return Scripter._cubic('easeInBounce', t)
 def ease_back_out(t):
   return scene_drawing.curve_ease_back_out(t)
+def ease_back_out_alt(t):
+  return Scripter._cubic('easeOutBounce', t)
 def ease_back_in_out(t):
   return scene_drawing.curve_ease_back_in_out(t)
+def ease_back_in_out_alt(t):
+  return Scripter._cubic('easeInOutBounce', t)
 
 def mirror(ease_func, t):
   ''' Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".'''
