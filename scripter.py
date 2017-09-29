@@ -46,7 +46,7 @@ import scene_drawing
 
 from types import GeneratorType, SimpleNamespace
 from numbers import Number
-from functools import partial
+from functools import partial, wraps
 import time, math
 
 #docgen: Script management
@@ -62,7 +62,7 @@ def script(func):
   New scripts suspend the execution of the parent script until all the parallel scripts have
   completed, after which the `update` method will resume the execution of the parent script.
   '''
-  
+  @wraps(func)
   def wrapper(view, *args, **kwargs):
     gen = func(view, *args, **kwargs)
     if not isinstance(gen, GeneratorType):
@@ -307,21 +307,6 @@ class Scripter(View):
   
 #docgen: Animation primitives
   
-@script
-def timer(view, duration, action=None):
-  ''' Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
-  controlling Scripter instance. Optional action function is called every cycle. '''
-  
-  scr = find_scripter_instance(view)
-  start_time = time.time()
-  dt = 0
-  while dt < duration:
-    if action: action()
-    yield
-    if scr.time_paused > 0:
-      start_time += scr.time_paused
-    dt = time.time() - start_time
-  
 @script  
 def set_value(view, attribute, value, func=None):
   '''
@@ -417,55 +402,31 @@ def slide_color(view, attribute, end_value, **kwargs):
   
   return slide_tuple(view, attribute, end_value, start_value=start_value, **kwargs)
 
+@script
+def timer(view, duration, action=None):
+  ''' Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
+  controlling Scripter instance. Optional action function is called every cycle. '''
+  
+  scr = find_scripter_instance(view)
+  start_time = time.time()
+  dt = 0
+  while dt < duration:
+    if action: action()
+    yield
+    if scr.time_paused > 0:
+      start_time += scr.time_paused
+    dt = time.time() - start_time
+
+
 #docgen: Animation effects
 
 @script
-def hide(view, **kwargs):
-  ''' Fade the view away, then set as hidden '''  
-  slide_value(view, 'alpha', 0.0, **kwargs)
-  yield
-  view.hidden = True
+def expand(view, **kwargs):
+  ''' Expands the view to fill all of its superview. '''
+  move(view, 0, 0, **kwargs)
+  slide_value(view, 'width', view.superview.width, **kwargs)
+  slide_value(view, 'height', view.superview.height, **kwargs)
 
-@script 
-def show(view, **kwargs):
-  ''' Unhide view, then fade in. '''
-  view.alpha = 0.0
-  view.hidden = False
-  slide_value(view, 'alpha', 1.0, **kwargs)
-
-@script
-def pulse(view, color='#67cf70', **kwargs):
-  ''' Pulses the background of the view to the given color and back to the original color.
-  Default color is a shade of green. '''
-  ease_func = partial(mirror, ease_in)
-  slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
-  
-  '''
-  orig_color = view.background_color
-  slide_color(view, 'background_color', color, ease_func='easeOut')
-  yield
-  slide_color(view, 'background_color', orig_color, ease_func='easeIn')
-  '''
-
-@script    
-def move(view, x, y, **kwargs):
-  ''' Move to x, y. '''
-  slide_value(view, 'x', x, **kwargs)
-  slide_value(view, 'y', y, **kwargs)
-
-@script    
-def rotate(view, degrees, **kwargs):
-  ''' Rotate view given degrees. Set start_value if not starting from 0. '''
-  start_value = kwargs.pop('start_value', 0)
-  radians = degrees/360*2*math.pi
-  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r), **kwargs)
-  
-@script    
-def scale(view, factor, **kwargs):
-  ''' Scale view by a given factor in both x and y dimensions. Set start_value if not starting from 1. '''
-  start_value = kwargs.pop('start_value', 1)
-  slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
-  
 @script
 def fly_out(view, direction, **kwargs):
   ''' Moves the view out of the screen in the given direction. Direction is one of the
@@ -479,15 +440,68 @@ def fly_out(view, direction, **kwargs):
     target_coord = targets[direction]
   except KeyError:
     raise ValueError('Direction must be one of ' + str(list(targets.keys())))
-  slide_value(view, target_coord[0], target_coord[1], ease_func='easeIn', **kwargs)
+  slide_value(view, target_coord[0], target_coord[1], **kwargs)
 
 @script
-def expand(view, **kwargs):
-  ''' Expands the view to fill all of its superview. '''
-  move(view, 0, 0, **kwargs)
-  slide_value(view, 'width', view.superview.width, **kwargs)
-  slide_value(view, 'height', view.superview.height, **kwargs)
+def hide(view, **kwargs):
+  ''' Fade the view away, then set as hidden '''  
+  slide_value(view, 'alpha', 0.0, **kwargs)
+  yield
+  view.hidden = True
+
+@script    
+def move(view, x, y, **kwargs):
+  ''' Move to x, y. '''
+  slide_value(view, 'x', x, **kwargs)
+  slide_value(view, 'y', y, **kwargs)
   
+@script    
+def move_by(view, dx, dy, **kwargs):
+  ''' Adjust position by dx, dy. '''
+  slide_value(view, 'x', view.x + dx, **kwargs)
+  slide_value(view, 'y', view.y + dy, **kwargs)
+
+@script
+def pulse(view, color='#67cf70', **kwargs):
+  ''' Pulses the background of the view to the given color and back to the original color.
+  Default color is a shade of green. '''
+  ease_func = partial(mirror, ease_in)
+  slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
+
+@script    
+def rotate(view, degrees, **kwargs):
+  ''' Rotate view to an absolute angle. Set start_value if not starting from 0. Does not mix with other transformations'''
+  start_value = kwargs.pop('start_value', 0)
+  radians = degrees/360*2*math.pi
+  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r), **kwargs)
+  
+@script    
+def rotate_by(view, degrees, **kwargs):
+  ''' Rotate view by given degrees. '''
+  start_value = kwargs.pop('start_value', 0)
+  radians = degrees/360*2*math.pi
+  starting_transform = view.transform
+  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
+  
+@script    
+def scale(view, factor, **kwargs):
+  ''' Scale view to a given factor in both x and y dimensions. Set start_value if not starting from 1. '''
+  start_value = kwargs.pop('start_value', 1)
+  slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
+
+@script    
+def scale_by(view, factor, **kwargs):
+  ''' Scale view relative to current scale factor. '''
+  start_value = kwargs.pop('start_value', 1)
+  starting_transform = view.transform
+  slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r) if not starting_transform else starting_transform.concat(Transform.scale(r, r)), **kwargs)
+
+@script 
+def show(view, **kwargs):
+  ''' Unhide view, then fade in. '''
+  view.alpha = 0.0
+  view.hidden = False
+  slide_value(view, 'alpha', 1.0, **kwargs)
 
 #docgen: Easing functions
 

@@ -125,11 +125,6 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   run them, you need to use this method first to find the right one.
 
 #### ANIMATION PRIMITIVES
-#### `@script timer(view, duration, action=None)`
-
-  Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
-  controlling Scripter instance. Optional action function is called every cycle. 
-
 #### `@script set_value(view, attribute, value, func=None)`
 
   Generator that sets the `attribute` to a `value` once, or several times if the value itself is a 
@@ -163,40 +158,57 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   Slide a color value. Supports same
   arguments than `slide_value`. 
 
+#### `@script timer(view, duration, action=None)`
+
+  Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
+  controlling Scripter instance. Optional action function is called every cycle. 
+
 #### ANIMATION EFFECTS
-#### `@script hide(view, **kwargs)`
+#### `@script expand(view, **kwargs)`
 
-  Fade the view away, then set as hidden 
-
-#### `@script show(view, **kwargs)`
-
-  Unhide view, then fade in. 
-
-#### `@script pulse(view, color='#67cf70', **kwargs)`
-
-  Pulses the background of the view to the given color and back to the original color.
-  Default color is a shade of green. 
-
-#### `@script move(view, x, y, **kwargs)`
-
-  Move to x, y. 
-
-#### `@script rotate(view, degrees, **kwargs)`
-
-  Rotate view given degrees. Set start_value if not starting from 0. 
-
-#### `@script scale(view, factor, **kwargs)`
-
-  Scale view by a given factor in both x and y dimensions. Set start_value if not starting from 1. 
+  Expands the view to fill all of its superview. 
 
 #### `@script fly_out(view, direction, **kwargs)`
 
   Moves the view out of the screen in the given direction. Direction is one of the
   following strings: 'up', 'down', 'left', 'right'. 
 
-#### `@script expand(view, **kwargs)`
+#### `@script hide(view, **kwargs)`
 
-  Expands the view to fill all of its superview. 
+  Fade the view away, then set as hidden 
+
+#### `@script move(view, x, y, **kwargs)`
+
+  Move to x, y. 
+
+#### `@script move_by(view, dx, dy, **kwargs)`
+
+  Adjust position by dx, dy. 
+
+#### `@script pulse(view, color='#67cf70', **kwargs)`
+
+  Pulses the background of the view to the given color and back to the original color.
+  Default color is a shade of green. 
+
+#### `@script rotate(view, degrees, **kwargs)`
+
+  Rotate view to an absolute angle. Set start_value if not starting from 0. Does not mix with other transformations
+
+#### `@script rotate_by(view, degrees, **kwargs)`
+
+  Rotate view by given degrees. 
+
+#### `@script scale(view, factor, **kwargs)`
+
+  Scale view to a given factor in both x and y dimensions. Set start_value if not starting from 1. 
+
+#### `@script scale_by(view, factor, **kwargs)`
+
+  Scale view relative to current scale factor. 
+
+#### `@script show(view, **kwargs)`
+
+  Unhide view, then fade in. 
 
 #### EASING FUNCTIONS
 #### ` linear(t)`

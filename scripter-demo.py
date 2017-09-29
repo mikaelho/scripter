@@ -1,6 +1,6 @@
 #coding: utf-8
 from functools import partial
-import math
+import math, inspect
 
 from ui import *
 import dialogs
@@ -68,72 +68,113 @@ if __name__ == '__main__':
   v = DemoView()
   v.background_color = 'white'
   v.present('full_screen')
+  
+  c = TextView(frame=(20, 450, v.width-40, v.height-470), flex='WH')
+  v.add_subview(c)
 
   d = View(frame=(0,0,10,10), corner_radius=5, background_color='black')
   d.center = (200,400)
   v.add_subview(d)
 
-  l = Label(text='Demo', hidden=True, alignment=ALIGN_CENTER, frame=(100, -100, 75, 40), corner_radius=10)
-  v.add_subview(l)
+  demo_label = Label(text='Demo', hidden=True, alignment=ALIGN_CENTER, frame=(100, -100, 75, 40), corner_radius=10)
+  v.add_subview(demo_label)
 
   @script
   def demo_action(view, demo_func, sender):
     demo_func(view)
     slide_value(d, 'x', d.x+140, duration=effect_duration)
     slide_value(d, 'y', d.y-140, ease_func=ease_function, duration=effect_duration)
+    code = inspect.getsource(demo_func)
+    code = code.replace('ease_function', ease_function.__name__)
+    code = code.replace('effect_duration', str(effect_duration))
+    lines = code.splitlines()
+    code = '\n'.join(lines[2:])
+    c.text = code
     yield 2 # sec delay before restoring state
     initial_state()
     
   def initial_state():
-    slide_tuple(l, 'frame', (100, 380, 75, 40))
-    l.hidden = False
-    l.alpha = 1.0
-    l.transform = Transform.rotation(0)
-    l.font = ('<system>', 16)
-    slide_color(l, 'background_color', 'transparent')
+    slide_tuple(demo_label, 'frame', (100, 380, 75, 40))
+    demo_label.hidden = False
+    demo_label.alpha = 1.0
+    demo_label.transform = Transform.rotation(0)
+    demo_label.font = ('<system>', 16)
+    slide_color(demo_label, 'background_color', 'transparent')
     slide_value(d, 'center', (200,400))
 
   initial_state()
 
   @script
-  def demo_hide(view):
-    hide(l, duration=effect_duration)
-
-  @script
   def demo_move(view):
-    move(l, 100, 240, duration=effect_duration, ease_func=ease_function)
+    move(demo_label, 100, 240, duration=effect_duration, ease_func=ease_function)
+    
+  @script
+  def demo_move_by(view):
+    facets = 36
+    
+    from vector import Vector
+    vct = Vector(0, facets/2)
+    
+    for _ in range(facets):
+      move_by(demo_label, vct.x, vct.y, duration=effect_duration/facets, ease_func=ease_function)
+      yield
+      vct.degrees -= 360/facets
+    
+  @script
+  def demo_hide(view):
+    hide(demo_label, duration=effect_duration, ease_func=ease_function)
     
   @script
   def demo_pulse(view):
-    pulse(l)
+    pulse(demo_label)
     
+  @script
   def demo_rotate(view):
-    rotate(l, 360, duration=effect_duration, ease_func=ease_function)
+    rotate(demo_label, 360, duration=effect_duration, ease_func=ease_function)
+   
+  @script 
+  def demo_rotate_by(view):
+    for _ in range(6):
+      rotate_by(demo_label, 60, duration=effect_duration/6, ease_func=ease_function)
+      yield
     
+  @script
   def demo_scale(view):
-    scale(l, 3, duration=effect_duration, ease_func=ease_function)
+    scale(demo_label, 3, duration=effect_duration, ease_func=ease_function)
+  
+  @script  
+  def demo_scale_by(view):
+    for _ in range(3):
+      scale_by(demo_label, 2, duration=effect_duration/3, ease_func=ease_function)
+      yield
     
+  @script
   def demo_fly_out(view):
-    fly_out(l, 'down', duration=effect_duration, ease_func=ease_function)
+    fly_out(demo_label, 'down', duration=effect_duration, ease_func=ease_function)
 
+  @script
   def demo_expand(view):
-    l.background_color = 'grey'
-    expand(l, duration=effect_duration, ease_func=ease_function)
+    demo_label.background_color = 'grey'
+    expand(demo_label, duration=effect_duration, ease_func=ease_function)
     
+  @script
   def demo_font_size(view):
     def size_but_keep_centered():
-      cntr = l.center
-      l.size_to_fit()
-      l.center = cntr
+      cntr = demo_label.center
+      demo_label.size_to_fit()
+      demo_label.center = cntr
       
-    slide_value(l, 'font', 64, start_value=l.font[1], map_func=lambda v: ('<system>', v), duration=effect_duration, ease_func=ease_function, side_func=size_but_keep_centered)
+    slide_value(demo_label, 'font', 64, start_value=demo_label.font[1], map_func=lambda font_size: ('<system>', font_size), duration=effect_duration, ease_func=ease_function, side_func=size_but_keep_centered)
 
   demos = [
-    ('Hide',),
     ('Move',),
+    ('Move by',),
+    ('Hide',),
     ('Pulse',),
     ('Rotate',),
+    ('Rotate by',),
     ('Scale',),
+    ('Scale by',),
     ('Fly out',),
     ('Expand',),
     ('Font size',)
