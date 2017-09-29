@@ -30,9 +30,9 @@ As small delays are often needed for natural-feeling animations, you can append 
 
 Another key for good animations is the use of easing functions that modify how a value is changed from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
   
-    slide_value(view, 'x', 200, ease_func=curve_bounce_out)
+    slide_value(view, 'x', 200, ease_func=bounce_out)
     
-See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/scene_drawing%20ease%20funcs.jpg) to pick the right function.
+See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function.
         
 Run scripter.py in Pythonista to see a demo of most of the available effects.
         
@@ -465,7 +465,8 @@ def move_by(view, dx, dy, **kwargs):
 def pulse(view, color='#67cf70', **kwargs):
   ''' Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. '''
-  ease_func = partial(mirror, ease_in)
+  root_func = kwargs.pop('ease_func', ease_in)
+  ease_func = partial(mirror, root_func)
   slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
 
 @script    

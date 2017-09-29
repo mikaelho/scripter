@@ -65,6 +65,8 @@ if __name__ == '__main__':
   effect_duration = 0.5
   ease_function = linear
   
+  cleaner = None
+  
   v = DemoView()
   v.background_color = 'white'
   v.present('full_screen')
@@ -81,6 +83,9 @@ if __name__ == '__main__':
 
   @script
   def demo_action(view, demo_func, sender):
+    global cleaner
+    if cleaner:
+      find_scripter_instance(view).cancel(cleaner)
     demo_func(view)
     slide_value(d, 'x', d.x+140, duration=effect_duration)
     slide_value(d, 'y', d.y-140, ease_func=ease_function, duration=effect_duration)
@@ -90,7 +95,15 @@ if __name__ == '__main__':
     lines = code.splitlines()
     code = '\n'.join(lines[2:])
     c.text = code
-    yield 2 # sec delay before restoring state
+    cleaner = clean_up(view, effect_duration+2)
+    #yield 2 # sec delay before restoring state
+    #initial_state()
+  
+  @script  
+  def clean_up(view, delay):
+    global cleaner
+    yield delay
+    cleaner = None
     initial_state()
     
   def initial_state():
@@ -126,7 +139,7 @@ if __name__ == '__main__':
     
   @script
   def demo_pulse(view):
-    pulse(demo_label)
+    pulse(demo_label, duration=effect_duration, ease_func=ease_function)
     
   @script
   def demo_rotate(view):

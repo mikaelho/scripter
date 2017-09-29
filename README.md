@@ -27,9 +27,9 @@ As small delays are often needed for natural-feeling animations, you can append 
 
 Another key for good animations is the use of easing functions that modify how a value is changed from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
   
-    slide_value(view, 'x', 200, ease_func=curve_bounce_out)
+    slide_value(view, 'x', 200, ease_func=bounce_out)
     
-See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/scene_drawing%20ease%20funcs.jpg) to pick the right function.
+See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function.
         
 Run scripter.py in Pythonista to see a demo of most of the available effects.
         
@@ -226,6 +226,9 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 #### ` ease_in_out(t)`
 
 
+#### ` ease_out_in(t)`
+
+
 #### ` elastic_out(t)`
 
 
@@ -247,10 +250,19 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 #### ` ease_back_in(t)`
 
 
+#### ` ease_back_in_alt(t)`
+
+
 #### ` ease_back_out(t)`
 
 
+#### ` ease_back_out_alt(t)`
+
+
 #### ` ease_back_in_out(t)`
+
+
+#### ` ease_back_in_out_alt(t)`
 
 
 #### ` mirror(ease_func, t)`
