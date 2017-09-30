@@ -13,22 +13,24 @@ In order to start using the animation effects, just import scripter and call the
     
     hide(my_button)
     
-Effects expect an active UI view as the first argument. This can be `self` or `sender`, where applicable. Effects like this run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
+Effects expect an active UI view as the first argument. Effects run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
 
 If you want to create a more complex animation from the effects provided, combine them in a script:
   
     @script
-    def my_script():
-      move(my_button, 50, 200)
-      pulse(my_button, 'red')
+    def my_effect(view):
+      move(view, 50, 200)
+      pulse(view, 'red')
       yield
-      hide(my_button, duration=2.0)
+      hide(view, duration=2.0)
       
-Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, `my_button` slowly fades away', in 2 seconds.
+Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, view fades away slowly, in 2 seconds.
+
+As the view provided as the first argument can of course be `self` or `sender`, scripts fit naturally as custom `ui.View` methods or `action` functions. 
 
 As small delays are often needed for natural-feeling animations, you can append a number after a `yield` statement, to suspend the execution of the script for that duration, or `yield 'wait'` for the default duration.
 
-Another key for good animations is the use of easing functions that modify how a value is changed from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
+Another key for good animations is the use of easing functions that modify how the value progresses from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
   
     slide_value(view, 'x', 200, ease_func=bounce_out)
     
@@ -174,41 +176,44 @@ class Scripter(View):
     * Resumes parent scripts whose children have all completed.
     * Sets `update_interval` to 0 if all scripts have completed.
     '''
-    for gen in self.activate:
-      self.active_gens.add(gen)
-    for gen in self.deactivate:
-      self.active_gens.remove(gen)
-    self.activate = set()
-    self.deactivate = set()
-    gen_to_end = []
-    for gen in self.active_gens:
-      self.current_gen = gen
-      wait_time = self.should_wait.pop(gen, None)
-      if wait_time is not None:
-        timer(self.view_for_gen[gen], wait_time)
-      else:
-        wait_time = None
-        try:
-          wait_time = next(gen)
-        except StopIteration:
-          if gen not in self.deactivate:
-            gen_to_end.append(gen)
+    run_at_least_once = True
+    while run_at_least_once or len(self.activate) > 0 or len(self.deactivate) > 0:
+      run_at_least_once = False
+      for gen in self.activate:
+        self.active_gens.add(gen)
+      for gen in self.deactivate:
+        self.active_gens.remove(gen)
+      self.activate = set()
+      self.deactivate = set()
+      gen_to_end = []
+      for gen in self.active_gens:
+        self.current_gen = gen
+        wait_time = self.should_wait.pop(gen, None)
         if wait_time is not None:
-          if wait_time == 'wait':
-            wait_time = self.default_duration
-          if isinstance(wait_time, Number):
-            self.should_wait[gen] = wait_time
-    self.current_gen = 'root'
-    self.time_paused = 0
-    for gen in gen_to_end:
-      self.active_gens.remove(gen)
-      parent_gen = self.parent_gens[gen]
-      del self.parent_gens[gen]
-      if parent_gen != 'root':
-        self.standby_gens[parent_gen].remove(gen)
-        if len(self.standby_gens[parent_gen]) == 0:
-          self.active_gens.add(parent_gen)
-          del self.standby_gens[parent_gen]
+          timer(self.view_for_gen[gen], wait_time)
+        else:
+          wait_time = None
+          try:
+            wait_time = next(gen)
+          except StopIteration:
+            if gen not in self.deactivate:
+              gen_to_end.append(gen)
+          if wait_time is not None:
+            if wait_time == 'wait':
+              wait_time = self.default_duration
+            if isinstance(wait_time, Number):
+              self.should_wait[gen] = wait_time
+      self.current_gen = 'root'
+      self.time_paused = 0
+      for gen in gen_to_end:
+        self.active_gens.remove(gen)
+        parent_gen = self.parent_gens[gen]
+        del self.parent_gens[gen]
+        if parent_gen != 'root':
+          self.standby_gens[parent_gen].remove(gen)
+          if len(self.standby_gens[parent_gen]) == 0:
+            self.activate.add(parent_gen)
+            del self.standby_gens[parent_gen]
     if len(self.active_gens) == 0:
       self.update_interval = 0.0
       self.running = False
@@ -502,6 +507,11 @@ def show(view, **kwargs):
   view.hidden = False
   slide_value(view, 'alpha', 1.0, **kwargs)
 
+@script
+def wobble(view):
+  ''' Little wobble of a view, intended to attract attention. '''
+  rotate(view, 10, duration=0.3, ease_func=oscillate)
+
 #docgen: Easing functions
 
 def linear(t):
@@ -540,6 +550,10 @@ def ease_back_in_out(t):
   return scene_drawing.curve_ease_back_in_out(t)
 def ease_back_in_out_alt(t):
   return Scripter._cubic('easeInOutBounce', t)
+
+def oscillate(t):
+  ''' Basic sine curve that runs from 0 through 1, 0 and -1, and back to 0. '''
+  return math.sin(t*2*math.pi)
 
 def mirror(ease_func, t):
   ''' Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".'''
