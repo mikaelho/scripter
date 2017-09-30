@@ -551,10 +551,6 @@ def ease_back_in_out(t):
 def ease_back_in_out_alt(t):
   return Scripter._cubic('easeInOutBounce', t)
 
-def oscillate(t):
-  ''' Basic sine curve that runs from 0 through 1, 0 and -1, and back to 0. '''
-  return math.sin(t*2*math.pi)
-
 def mirror(ease_func, t):
   ''' Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".'''
   ease_func = ease_func if callable(ease_func) else partial(Scripter._cubic, ease_func)
@@ -566,6 +562,16 @@ def mirror(ease_func, t):
     t /= 0.5
     return ease_func(1-t)
 
+def mirror_ease_in(t):
+  return mirror(ease_in, t)
+  
+def mirror_ease_in_out(t):
+  return mirror(ease_in_out, t)
+
+def oscillate(t):
+  ''' Basic sine curve that runs from 0 through 1, 0 and -1, and back to 0. '''
+  return math.sin(t*2*math.pi)
+  
 
 if __name__ == '__main__':
   
