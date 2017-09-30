@@ -10,22 +10,24 @@ In order to start using the animation effects, just import scripter and call the
     
     hide(my_button)
     
-Effects expect an active UI view as the first argument. This can be `self` or `sender`, where applicable. Effects like this run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
+Effects expect an active UI view as the first argument. Effects run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
 
 If you want to create a more complex animation from the effects provided, combine them in a script:
   
     @script
-    def my_script():
-      move(my_button, 50, 200)
-      pulse(my_button, 'red')
+    def my_effect(view):
+      move(view, 50, 200)
+      pulse(view, 'red')
       yield
-      hide(my_button, duration=2.0)
+      hide(view, duration=2.0)
       
-Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, `my_button` slowly fades away', in 2 seconds.
+Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, view fades away slowly, in 2 seconds.
+
+As the view provided as the first argument can of course be `self` or `sender`, scripts fit naturally as custom `ui.View` methods or `action` functions. 
 
 As small delays are often needed for natural-feeling animations, you can append a number after a `yield` statement, to suspend the execution of the script for that duration, or `yield 'wait'` for the default duration.
 
-Another key for good animations is the use of easing functions that modify how a value is changed from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
+Another key for good animations is the use of easing functions that modify how the value progresses from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
   
     slide_value(view, 'x', 200, ease_func=bounce_out)
     
@@ -208,6 +210,10 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   Unhide view, then fade in. 
 
+#### `@script wobble(view)`
+
+  Little wobble of a view, intended to attract attention. 
+
 #### EASING FUNCTIONS
 #### ` linear(t)`
 
@@ -262,6 +268,10 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
 #### ` ease_back_in_out_alt(t)`
 
+
+#### ` oscillate(t)`
+
+  Basic sine curve that runs from 0 through 1, 0 and -1, and back to 0. 
 
 #### ` mirror(ease_func, t)`
 
