@@ -60,7 +60,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 ## Methods
 
 
-#### ` update(self)`
+#### `update(self)`
 
   Main Scripter animation loop handler, called by the Puthonista UI loop and never by your
   code directly.
@@ -75,16 +75,16 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   * Resumes parent scripts whose children have all completed.
   * Sets `update_interval` to 0 if all scripts have completed.
 
-#### ` pause_play_all(self)`
+#### `pause_play_all(self)`
 
   Pause or play all animations. 
 
-#### ` cancel(self, script)`
+#### `cancel(self, script)`
 
   Cancels any ongoing animations and
   sub-scripts for the given script. 
 
-#### ` cancel_all(self)`
+#### `cancel_all(self)`
 
   Initializes all internal structures.
   Used at start and to cancel all running scripts.
@@ -100,7 +100,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
 
 #### SCRIPT MANAGEMENT
-#### ` script(func)`
+#### `script(func)`
 
   Decorator for the animation scripts. Scripts can be functions, methods or generators.
   
@@ -111,7 +111,7 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   New scripts suspend the execution of the parent script until all the parallel scripts have
   completed, after which the `update` method will resume the execution of the parent script.
 
-#### ` find_scripter_instance(view)`
+#### `find_scripter_instance(view)`
 
   Scripts need a "controller" ui.View that runs the update method for them. This function finds 
   or creates the controller for a view as follows:
@@ -125,7 +125,8 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   run them, you need to use this method first to find the right one.
 
 #### ANIMATION PRIMITIVES
-#### `@script set_value(view, attribute, value, func=None)`
+#### `set_value(view, attribute, value, func=None)`
+`@script`
 
   Generator that sets the `attribute` to a `value` once, or several times if the value itself is a 
   generator or an iterator.
@@ -134,7 +135,8 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   
   * `func` - called with the value, returns the actual value to be set
 
-#### `@script slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None, side_func=None)`
+#### `slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None, side_func=None)`
+`@script`
 
   Generator that "slides" the `value` of an
   `attribute` to an `end_value` in a given duration.
@@ -149,130 +151,151 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
   * `side_func` - Called without arguments each time after the main value has been set. Useful for side effects.
 
-#### `@script slide_tuple(view, *args, **kwargs)`
+#### `slide_tuple(view, *args, **kwargs)`
+`@script`
 
   Slide a tuple value of arbitrary length. Supports same arguments as `slide_value`. 
 
-#### `@script slide_color(view, attribute, end_value, **kwargs)`
+#### `slide_color(view, attribute, end_value, **kwargs)`
+`@script`
 
   Slide a color value. Supports same
   arguments than `slide_value`. 
 
-#### `@script timer(view, duration, action=None)`
+#### `timer(view, duration, action=None)`
+`@script`
 
   Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
   controlling Scripter instance. Optional action function is called every cycle. 
 
 #### ANIMATION EFFECTS
-#### `@script expand(view, **kwargs)`
+#### `expand(view, **kwargs)`
+`@script`
 
   Expands the view to fill all of its superview. 
 
-#### `@script fly_out(view, direction, **kwargs)`
+#### `fly_out(view, direction, **kwargs)`
+`@script`
 
   Moves the view out of the screen in the given direction. Direction is one of the
   following strings: 'up', 'down', 'left', 'right'. 
 
-#### `@script hide(view, **kwargs)`
+#### `hide(view, **kwargs)`
+`@script`
 
   Fade the view away, then set as hidden 
 
-#### `@script move(view, x, y, **kwargs)`
+#### `move(view, x, y, **kwargs)`
+`@script`
 
   Move to x, y. 
 
-#### `@script move_by(view, dx, dy, **kwargs)`
+#### `move_by(view, dx, dy, **kwargs)`
+`@script`
 
   Adjust position by dx, dy. 
 
-#### `@script pulse(view, color='#67cf70', **kwargs)`
+#### `pulse(view, color='#67cf70', **kwargs)`
+`@script`
 
   Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. 
 
-#### `@script rotate(view, degrees, **kwargs)`
+#### `rotate(view, degrees, **kwargs)`
+`@script`
 
   Rotate view to an absolute angle. Set start_value if not starting from 0. Does not mix with other transformations
 
-#### `@script rotate_by(view, degrees, **kwargs)`
+#### `rotate_by(view, degrees, **kwargs)`
+`@script`
 
   Rotate view by given degrees. 
 
-#### `@script scale(view, factor, **kwargs)`
+#### `scale(view, factor, **kwargs)`
+`@script`
 
   Scale view to a given factor in both x and y dimensions. Set start_value if not starting from 1. 
 
-#### `@script scale_by(view, factor, **kwargs)`
+#### `scale_by(view, factor, **kwargs)`
+`@script`
 
   Scale view relative to current scale factor. 
 
-#### `@script show(view, **kwargs)`
+#### `show(view, **kwargs)`
+`@script`
 
   Unhide view, then fade in. 
 
-#### `@script wobble(view)`
+#### `wobble(view)`
+`@script`
 
   Little wobble of a view, intended to attract attention. 
 
 #### EASING FUNCTIONS
-#### ` linear(t)`
+#### `linear(t)`
 
 
-#### ` sinusoidal(t)`
+#### `sinusoidal(t)`
 
 
-#### ` ease_in(t)`
+#### `ease_in(t)`
 
 
-#### ` ease_out(t)`
+#### `ease_out(t)`
 
 
-#### ` ease_in_out(t)`
+#### `ease_in_out(t)`
 
 
-#### ` ease_out_in(t)`
+#### `ease_out_in(t)`
 
 
-#### ` elastic_out(t)`
+#### `elastic_out(t)`
 
 
-#### ` elastic_in(t)`
+#### `elastic_in(t)`
 
 
-#### ` elastic_in_out(t)`
+#### `elastic_in_out(t)`
 
 
-#### ` bounce_out(t)`
+#### `bounce_out(t)`
 
 
-#### ` bounce_in(t)`
+#### `bounce_in(t)`
 
 
-#### ` bounce_in_out(t)`
+#### `bounce_in_out(t)`
 
 
-#### ` ease_back_in(t)`
+#### `ease_back_in(t)`
 
 
-#### ` ease_back_in_alt(t)`
+#### `ease_back_in_alt(t)`
 
 
-#### ` ease_back_out(t)`
+#### `ease_back_out(t)`
 
 
-#### ` ease_back_out_alt(t)`
+#### `ease_back_out_alt(t)`
 
 
-#### ` ease_back_in_out(t)`
+#### `ease_back_in_out(t)`
 
 
-#### ` ease_back_in_out_alt(t)`
+#### `ease_back_in_out_alt(t)`
 
 
-#### ` oscillate(t)`
-
-  Basic sine curve that runs from 0 through 1, 0 and -1, and back to 0. 
-
-#### ` mirror(ease_func, t)`
+#### `mirror(ease_func, t)`
 
   Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".
+
+#### `mirror_ease_in(t)`
+
+
+#### `mirror_ease_in_out(t)`
+
+
+#### `oscillate(t)`
+
+  Basic sine curve that runs from 0 through 1, 0 and -1, and back to 0. 
