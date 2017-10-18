@@ -2,6 +2,42 @@
 import math
 
 class Vector (list):
+  ''' Simple 2D vector class to make vector operations more convenient. If performance is a concern, you are probably better off looking at numpy.
+  
+  Supports the following operations:
+    
+  * Initialization from two arguments, two keyword  arguments (`x` and `y`), tuple, list, or another Vector.
+  * Equality and unequality comparisons to other vectors. For floating point numbers, equality tolerance is 1e-10.
+  * `abs`, `int` and `round`
+  * Addition and in-place addition
+  * Subtraction
+  * Multiplication and division by a scalar
+  * `len`, which is the same as `magnitude`, see below.
+  
+  Sample usage:
+    
+      v = Vector(x = 1, y = 2)
+      v2 = Vector(3, 4)
+      v += v2
+      assert str(v) == '[4, 6]'
+      assert v / 2.0 == Vector(2, 3)
+      assert v * 0.1 == Vector(0.4, 0.6)
+      assert v.distance_to(v2) == math.sqrt(1+4)
+    
+      v3 = Vector(Vector(1, 2) - Vector(2, 0)) # -1.0, 2.0
+      v3.magnitude *= 2
+      assert v3 == [-2, 4]
+    
+      v3.radians = math.pi # 180 degrees
+      v3.magnitude = 2
+      assert v3 == [-2, 0]
+      v3.degrees = -90
+      assert v3 == [0, -2]
+      
+      assert list(Vector(1, 1).steps_to(Vector(3, 3))) == [[1.7071067811865475, 1.7071067811865475], [2.414213562373095, 2.414213562373095], [3, 3]]
+      assert list(Vector(1, 1).steps_to(Vector(-1, 1))) == [[0, 1], [-1, 1]]
+      assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [2, 2], [3, 3]]
+  '''
 
   abs_tol = 1e-10
 
@@ -20,6 +56,7 @@ class Vector (list):
 
   @property
   def x(self):
+    ''' x component of the vector. '''
     return self[0]
 
   @x.setter
@@ -28,6 +65,7 @@ class Vector (list):
 
   @property
   def y(self):
+    ''' y component of the vector. '''
     return self[1]
 
   @y.setter
@@ -70,13 +108,16 @@ class Vector (list):
     return type(self)(round(self.x), round(self.y))
 
   def dot_product(self, other):
+    ''' Sum of multiplying x and y components with the x and y components of another vector. '''
     return self.x * other.x + self.y * other.y
 
   def distance_to(self, other):
+    ''' Linear distance between this vector and another. '''
     return (Vector(other) - self).magnitude
 
   @property
   def magnitude(self):
+    ''' Length of the vector, or distance from (0,0) to (x,y). '''
     return math.hypot(self.x, self.y)
 
   @magnitude.setter
@@ -86,6 +127,7 @@ class Vector (list):
 
   @property
   def radians(self):
+    ''' Angle between the positive x axis and this vector, in radians. '''
     #return round(math.atan2(self.y, self.x), 10)
     return math.atan2(self.y, self.x)
 
@@ -95,11 +137,13 @@ class Vector (list):
     self.polar(r, m)
 
   def polar(self, r, m):
+    ''' Set vector in polar coordinates. `r` is the angle in radians, `m` is vector magnitude or "length". '''
     self.y = math.sin(r) * m
     self.x = math.cos(r) * m
     
   @property
   def degrees(self):
+    ''' Angle between the positive x axis and this vector, in degrees. '''
     return math.degrees(self.radians)
 
   @degrees.setter
@@ -107,7 +151,7 @@ class Vector (list):
     self.radians = math.radians(d)
     
   def steps_to(self, other, step_magnitude=1.0):
-    """ Generator that returns points on the line between this and the other point. Does not include the starting point. """
+    """ Generator that returns points on the line between this and the other point, with each step separated by `step_magnitude`. Does not include the starting point. """
     if self == other:
       yield other
     else:
@@ -122,13 +166,14 @@ class Vector (list):
         yield other
         
   def rounded_steps_to(self, other, step_magnitude=1.0):
+    ''' As `steps_to`, but returns points rounded to the nearest integer. '''
     for step in self.steps_to(other):
       yield round(step)
     
 
 if __name__ == '__main__':
   v = Vector(x = 1, y = 2)
-  v2 = Vector(3,4)
+  v2 = Vector(3, 4)
   v += v2
   assert str(v) == '[4, 6]'
   assert v / 2.0 == Vector(2, 3)

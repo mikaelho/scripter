@@ -135,7 +135,6 @@ if __name__ == '__main__':
   def demo_move_by(view):
     facets = 36
     
-    from vector import Vector
     vct = Vector(0, facets/2)
     
     for _ in range(facets):
@@ -152,6 +151,11 @@ if __name__ == '__main__':
   @script
   def demo_pulse(view):
     pulse(view, duration=effect_duration, ease_func=ease_function)
+    
+  @script
+  def demo_roll_to(view):
+    cx, cy = view.center
+    roll_to(view, (cx, cy-140), duration=effect_duration, ease_func=ease_function)
     
   @script
   def demo_rotate(view):
@@ -223,6 +227,7 @@ if __name__ == '__main__':
     ('Pulse', False),
     ('Expand', True),
     ('Count', False),
+    ('Roll to', True),
     ('Rotate', True),
     ('Rotate by', False),
     ('Scale', True),

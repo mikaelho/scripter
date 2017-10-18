@@ -307,6 +307,174 @@ class Scripter(View):
       u = params
     return u[0]*(1-t)**3 + 3*u[1]*(1-t)**2*t + 3*u[2]*(1-t)*t**2 + u[3]*t**3
 
+class Vector (list):
+  ''' Simple 2D vector class to make vector operations more convenient. If performance is a concern, you are probably better off looking at numpy.
+  
+  Supports the following operations:
+    
+  * Initialization from two arguments, two keyword  arguments (`x` and `y`), tuple, list, or another Vector.
+  * Equality and unequality comparisons to other vectors. For floating point numbers, equality tolerance is 1e-10.
+  * `abs`, `int` and `round`
+  * Addition and in-place addition
+  * Subtraction
+  * Multiplication and division by a scalar
+  * `len`, which is the same as `magnitude`, see below.
+  
+  Sample usage:
+    
+      v = Vector(x = 1, y = 2)
+      v2 = Vector(3, 4)
+      v += v2
+      assert str(v) == '[4, 6]'
+      assert v / 2.0 == Vector(2, 3)
+      assert v * 0.1 == Vector(0.4, 0.6)
+      assert v.distance_to(v2) == math.sqrt(1+4)
+    
+      v3 = Vector(Vector(1, 2) - Vector(2, 0)) # -1.0, 2.0
+      v3.magnitude *= 2
+      assert v3 == [-2, 4]
+    
+      v3.radians = math.pi # 180 degrees
+      v3.magnitude = 2
+      assert v3 == [-2, 0]
+      v3.degrees = -90
+      assert v3 == [0, -2]
+      
+      assert list(Vector(1, 1).steps_to(Vector(3, 3))) == [[1.7071067811865475, 1.7071067811865475], [2.414213562373095, 2.414213562373095], [3, 3]]
+      assert list(Vector(1, 1).steps_to(Vector(-1, 1))) == [[0, 1], [-1, 1]]
+      assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [2, 2], [3, 3]]
+  '''
+
+  abs_tol = 1e-10
+
+  def __init__(self, *args, **kwargs):
+    x = kwargs.pop('x', None)
+    y = kwargs.pop('y', None)
+
+    if x and y:
+      self.append(x)
+      self.append(y)
+    elif len(args) == 2:
+      self.append(args[0])
+      self.append(args[1])
+    else:
+      super().__init__(*args, **kwargs)
+
+  @property
+  def x(self):
+    ''' x component of the vector. '''
+    return self[0]
+
+  @x.setter
+  def x(self, value):
+    self[0] = value
+
+  @property
+  def y(self):
+    ''' y component of the vector. '''
+    return self[1]
+
+  @y.setter
+  def y(self, value):
+    self[1] = value
+
+  def __eq__(self, other):
+    return math.isclose(self[0], other[0], abs_tol=self.abs_tol) and math.isclose(self[1], other[1], abs_tol=self.abs_tol)
+    
+  def __ne__(self, other):
+    return not self.__eq__(other)
+
+  def __abs__(self):
+    return type(self)(abs(self.x), abs(self.y))
+
+  def __int__(self):
+    return type(self)(int(self.x), int(self.y))
+
+  def __add__(self, other):
+    return type(self)(self.x + other.x, self.y + other.y)
+    
+  def __iadd__(self, other):
+    self.x += other.x
+    self.y += other.y
+    return self
+
+  def __sub__(self, other):
+    return type(self)(self.x - other.x, self.y - other.y)
+
+  def __mul__(self, other):
+    return type(self)(self.x * other, self.y * other)
+
+  def __truediv__(self, other):
+    return type(self)(self.x / other, self.y / other)
+
+  def __len__(self):
+    return self.magnitude
+    
+  def __round__(self):
+    return type(self)(round(self.x), round(self.y))
+
+  def dot_product(self, other):
+    ''' Sum of multiplying x and y components with the x and y components of another vector. '''
+    return self.x * other.x + self.y * other.y
+
+  def distance_to(self, other):
+    ''' Linear distance between this vector and another. '''
+    return (Vector(other) - self).magnitude
+
+  @property
+  def magnitude(self):
+    ''' Length of the vector, or distance from (0,0) to (x,y). '''
+    return math.hypot(self.x, self.y)
+
+  @magnitude.setter
+  def magnitude(self, m):
+    r = self.radians
+    self.polar(r, m)
+
+  @property
+  def radians(self):
+    ''' Angle between the positive x axis and this vector, in radians. '''
+    #return round(math.atan2(self.y, self.x), 10)
+    return math.atan2(self.y, self.x)
+
+  @radians.setter
+  def radians(self, r):
+    m = self.magnitude
+    self.polar(r, m)
+
+  def polar(self, r, m):
+    ''' Set vector in polar coordinates. `r` is the angle in radians, `m` is vector magnitude or "length". '''
+    self.y = math.sin(r) * m
+    self.x = math.cos(r) * m
+    
+  @property
+  def degrees(self):
+    ''' Angle between the positive x axis and this vector, in degrees. '''
+    return math.degrees(self.radians)
+
+  @degrees.setter
+  def degrees(self, d):
+    self.radians = math.radians(d)
+    
+  def steps_to(self, other, step_magnitude=1.0):
+    """ Generator that returns points on the line between this and the other point, with each step separated by `step_magnitude`. Does not include the starting point. """
+    if self == other:
+      yield other
+    else:
+      step_vector = other - self
+      steps = math.floor(step_vector.magnitude/step_magnitude)
+      step_vector.magnitude = step_magnitude
+      current_position = Vector(self)
+      for _ in range(steps):
+        current_position += step_vector
+        yield Vector(current_position)
+      if current_position != other:
+        yield other
+        
+  def rounded_steps_to(self, other, step_magnitude=1.0):
+    ''' As `steps_to`, but returns points rounded to the nearest integer. '''
+    for step in self.steps_to(other):
+      yield round(step)
   
 #docgen: Animation primitives
   
@@ -423,6 +591,16 @@ def timer(view, duration, action=None):
 
 #docgen: Animation effects
 
+@script    
+def center(view, move_center_to, **kwargs):
+  ''' Move view center. '''
+  slide_tuple(view, 'center', move_center_to, **kwargs)
+  
+@script    
+def center_by(view, dx, dy, **kwargs):
+  ''' Adjust view center position by dx, dy. '''
+  center(view, (view.center[0] + dx, view.center[1] + dy), **kwargs)
+
 @script
 def expand(view, **kwargs):
   ''' Expands the view to fill all of its superview. '''
@@ -472,11 +650,30 @@ def pulse(view, color='#67cf70', **kwargs):
   ease_func = partial(mirror, root_func)
   slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
 
+@script
+def roll_to(view, to_center, end_right_side_up=True, **kwargs):
+  ''' Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
+  View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards.
+  If `ease_func` is not provided, `ease_back_out_alt` is used by default. '''
+  roll_func = kwargs.pop('ease_func', ease_back_out_alt)
+  
+  from_center = view.center
+  roll_vector = Vector(to_center)-Vector(from_center)
+  roll_direction = 1 if roll_vector.x >= 0 else -1
+  roll_distance = roll_vector.magnitude
+  view_r = view.width/2
+  roll_degrees = roll_direction * 360 * roll_distance/(2*math.pi*view_r)
+  if end_right_side_up:
+    start_degrees = roll_direction * (360 - roll_degrees % 360)
+    view.transform = Transform.rotation(math.radians(start_degrees))
+  rotate_by(view, roll_degrees, ease_func=roll_func, **kwargs)
+  center(view, to_center, ease_func=roll_func, **kwargs)
+
 @script    
 def rotate(view, degrees, **kwargs):
-  ''' Rotate view to an absolute angle. Set start_value if not starting from 0. Does not mix with other transformations'''
-  start_value = kwargs.pop('start_value', 0)
-  radians = degrees/360*2*math.pi
+  ''' Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. Does not mix with other transformations. '''
+  start_value = math.radians(kwargs.pop('start_value', 0))
+  radians = math.radians(degrees)
   slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r), **kwargs)
   
 @script    
@@ -671,7 +868,7 @@ if __name__ == '__main__':
       yield 1
       # Transformations
       self.l.text = 'Rotating'
-      rotate(self, 720, ease_func=ease_back_in_out)
+      rotate(self, -720, ease_func=ease_back_in_out, duration=1.5)
       slide_color(self, 'background_color', 'green', duration=2.0)
       slide_color(self.l, 'text_color', 'white', duration=2.0)
       yield 'wait'
@@ -713,6 +910,11 @@ if __name__ == '__main__':
       yield
       slide_value(self, 'x', v.start_point.x, ease_func='easeOut', duration=2.0)
       slide_value(self, 'y', v.start_point.y-self.height, ease_func=scene_drawing.curve_bounce_out, duration=2.0)
+      yield 1.0
+      
+      self.l.text = 'Roll'
+      yield 'wait'
+      roll_to(self, (self.center[0]+170, self.center[1]), duration=2.0)
       yield 1.0
       
       v.axes_counter = 0
