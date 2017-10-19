@@ -653,10 +653,7 @@ def pulse(view, color='#67cf70', **kwargs):
 @script
 def roll_to(view, to_center, end_right_side_up=True, **kwargs):
   ''' Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
-  View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards.
-  If `ease_func` is not provided, `ease_back_out_alt` is used by default. '''
-  roll_func = kwargs.pop('ease_func', ease_back_out_alt)
-  
+  View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards. '''
   from_center = view.center
   roll_vector = Vector(to_center)-Vector(from_center)
   roll_direction = 1 if roll_vector.x >= 0 else -1
@@ -664,10 +661,10 @@ def roll_to(view, to_center, end_right_side_up=True, **kwargs):
   view_r = view.width/2
   roll_degrees = roll_direction * 360 * roll_distance/(2*math.pi*view_r)
   if end_right_side_up:
-    start_degrees = roll_direction * (360 - roll_degrees % 360)
+    start_degrees = roll_direction * (360 - abs(roll_degrees) % 360)
     view.transform = Transform.rotation(math.radians(start_degrees))
-  rotate_by(view, roll_degrees, ease_func=roll_func, **kwargs)
-  center(view, to_center, ease_func=roll_func, **kwargs)
+  rotate_by(view, roll_degrees, **kwargs)
+  center(view, to_center, **kwargs)
 
 @script    
 def rotate(view, degrees, **kwargs):
@@ -915,6 +912,8 @@ if __name__ == '__main__':
       self.l.text = 'Roll'
       yield 'wait'
       roll_to(self, (self.center[0]+170, self.center[1]), duration=2.0)
+      yield 1.0
+      roll_to(self, (self.center[0]-170, self.center[1]), duration=2.0)
       yield 1.0
       
       v.axes_counter = 0

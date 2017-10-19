@@ -42,6 +42,9 @@ _Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 bet
 * [Class: Scripter](#class-scripter)
   * [Methods](#methods)
   * [Properties](#properties)
+* [Class: Vector](#class-vector)
+  * [Methods](#methods)
+  * [Properties](#properties)
 * [Functions](#functions)
   * [Script management](#script-management)
   * [Animation primitives](#animation-primitives)
@@ -88,14 +91,102 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 
   Initializes all internal structures.
   Used at start and to cancel all running scripts.
-### Properties
+## Properties
 
 
 #### `default_update_interval (get, set)`
 
+  The running rate for the update method. Frames per second is here considered to be just an
+  alternative way of setting the update interval, and this property is linked to
+  `default_fps` - change one and the other will change as well.
 
 #### `default_fps (get, set)`
 
+  The running rate for the update method. Frames per second is here considered to be just an
+  alternative way of setting the update interval, and this property is linked to
+  `default_update_interval` - change one and the other will change as well.
+## Class: Vector
+
+Simple 2D vector class to make vector operations more convenient. If performance is a concern, you are probably better off looking at numpy.
+
+Supports the following operations:
+  
+* Initialization from two arguments, two keyword  arguments (`x` and `y`), tuple, list, or another Vector.
+* Equality and unequality comparisons to other vectors. For floating point numbers, equality tolerance is 1e-10.
+* `abs`, `int` and `round`
+* Addition and in-place addition
+* Subtraction
+* Multiplication and division by a scalar
+* `len`, which is the same as `magnitude`, see below.
+
+Sample usage:
+  
+    v = Vector(x = 1, y = 2)
+    v2 = Vector(3, 4)
+    v += v2
+    assert str(v) == '[4, 6]'
+    assert v / 2.0 == Vector(2, 3)
+    assert v * 0.1 == Vector(0.4, 0.6)
+    assert v.distance_to(v2) == math.sqrt(1+4)
+  
+    v3 = Vector(Vector(1, 2) - Vector(2, 0)) # -1.0, 2.0
+    v3.magnitude *= 2
+    assert v3 == [-2, 4]
+  
+    v3.radians = math.pi # 180 degrees
+    v3.magnitude = 2
+    assert v3 == [-2, 0]
+    v3.degrees = -90
+    assert v3 == [0, -2]
+    
+    assert list(Vector(1, 1).steps_to(Vector(3, 3))) == [[1.7071067811865475, 1.7071067811865475], [2.414213562373095, 2.414213562373095], [3, 3]]
+    assert list(Vector(1, 1).steps_to(Vector(-1, 1))) == [[0, 1], [-1, 1]]
+    assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [2, 2], [3, 3]]
+
+## Methods
+
+
+#### `dot_product(self, other)`
+
+  Sum of multiplying x and y components with the x and y components of another vector. 
+
+#### `distance_to(self, other)`
+
+  Linear distance between this vector and another. 
+
+#### `polar(self, r, m)`
+
+  Set vector in polar coordinates. `r` is the angle in radians, `m` is vector magnitude or "length". 
+
+#### `steps_to(self, other, step_magnitude=1.0)`
+
+  Generator that returns points on the line between this and the other point, with each step separated by `step_magnitude`. Does not include the starting point. 
+
+#### `rounded_steps_to(self, other, step_magnitude=1.0)`
+
+  As `steps_to`, but returns points rounded to the nearest integer. 
+## Properties
+
+
+#### `x (get, set)`
+
+  x component of the vector. 
+
+#### `y (get, set)`
+
+  y component of the vector. 
+
+#### `magnitude (get, set)`
+
+  Length of the vector, or distance from (0,0) to (x,y). 
+
+#### `radians (get, set)`
+
+  Angle between the positive x axis and this vector, in radians. 
+
+#### `degrees (get, set)`
+
+  Angle between the positive x axis and this vector, in degrees. 
 # Functions
 
 
@@ -169,6 +260,16 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   controlling Scripter instance. Optional action function is called every cycle. 
 
 #### ANIMATION EFFECTS
+#### `center(view, move_center_to, **kwargs)`
+`@script`
+
+  Move view center. 
+
+#### `center_by(view, dx, dy, **kwargs)`
+`@script`
+
+  Adjust view center position by dx, dy. 
+
 #### `expand(view, **kwargs)`
 `@script`
 
@@ -201,10 +302,16 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
   Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. 
 
+#### `roll_to(view, to_center, end_right_side_up=True, **kwargs)`
+`@script`
+
+  Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
+  View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards. 
+
 #### `rotate(view, degrees, **kwargs)`
 `@script`
 
-  Rotate view to an absolute angle. Set start_value if not starting from 0. Does not mix with other transformations
+  Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. Does not mix with other transformations. 
 
 #### `rotate_by(view, degrees, **kwargs)`
 `@script`
