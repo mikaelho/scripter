@@ -574,11 +574,12 @@ def slide_color(view, attribute, end_value, **kwargs):
   return slide_tuple(view, attribute, end_value, start_value=start_value, **kwargs)
 
 @script
-def timer(view, duration, action=None):
+def timer(view, duration=None, action=None):
   ''' Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
   controlling Scripter instance. Optional action function is called every cycle. '''
   
   scr = find_scripter_instance(view)
+  duration = duration or scr.default_duration
   start_time = time.time()
   dt = 0
   while dt < duration:
@@ -705,6 +706,14 @@ def show(view, **kwargs):
 def wobble(view):
   ''' Little wobble of a view, intended to attract attention. '''
   rotate(view, 10, duration=0.3, ease_func=oscillate)
+
+@script
+def reveal_text(view, **kwargs):
+  ''' Reveals text one letter at a time in the given duration. View must have a `text` attribute. '''
+  full_text = view.text
+    
+  slide_value(view, 'text', len(full_text), start_value=0, map_func=lambda value: full_text[:max(0, min(len(full_text), round(value)))], **kwargs)
+
 
 #docgen: Easing functions
 

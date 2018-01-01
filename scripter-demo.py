@@ -218,7 +218,10 @@ if __name__ == '__main__':
       color_changer = None
     else:
       color_changer = change_color_forever(view)
-    
+  
+  @script
+  def demo_reveal_text(view):
+    reveal_text(duration_label, duration=effect_duration, ease_func=ease_function)
 
   demos = [
     ('Move', True),
@@ -235,7 +238,8 @@ if __name__ == '__main__':
     ('Font size', True),
     ('Fly out', True),
     ('Wobble', False),
-    ('Colors', False)
+    ('Colors', False),
+    ('Reveal text', True),
   ]
   
   @script
@@ -268,7 +272,7 @@ if __name__ == '__main__':
   
   preset_durations = [0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0]
   
-  duration_label = Label(text='0.5 seconds', frame=(20,options_start,150,20), alignment=ALIGN_CENTER)
+  duration_label = Label(text='0.5 seconds', frame=(20,options_start,150,20), alignment=ALIGN_LEFT)
   duration_slider = Slider(frame=(20,options_start+25,150,20), continuous=True, value=0.1)
   v.add_subview(duration_label)
   v.add_subview(duration_slider)
