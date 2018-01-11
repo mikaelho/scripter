@@ -212,12 +212,14 @@ if __name__ == '__main__':
         random_color = (random(), random(), random(), 1.0)
         slide_color(view, 'background_color', random_color, duration=effect_duration)
         yield
-    
+
     if color_changer:
       find_scripter_instance(view).cancel(color_changer)
       color_changer = None
+      v['demo_colors'].background_color = 'black'
     else:
       color_changer = change_color_forever(view)
+      v['demo_colors'].background_color = 'red'
   
   @script
   def demo_reveal_text(view):
@@ -256,17 +258,24 @@ if __name__ == '__main__':
       v[func_name].background_color = 'black'
       yield
   
-  button_width = 110
-  button_height = 30
-  gap = 10
+  button_width = 90
+  button_height = 25
+  gap = 5
   width_gap = button_width + gap
   height_gap = button_height + gap
   buttons_per_line = math.floor((v.width-40)/width_gap)
   lines = (len(demos)+1)/buttons_per_line
   total_height = lines * height_gap
   
-  cy = buttons_start + total_height + 40
-  c.frame = (20, cy, v.width-40, v.height-cy-20)
+  cy = buttons_start + total_height + 20
+  
+  scroll_label = ScrollingBannerLabel(
+    text='Use this tool to experiment with the various scripter animation effects as well as the impact that changing the effect duration or ease function has. All effects are applied to the "Demo" label above. Select different ease functions to see them illustrated as a graph; the basic "Move" effect is probably the best starting point to understand ease functions. Launching several effects in quick succession will lead to unpredictable results. Code for each effect launched is displayed under this text for your copy-paste convenience in case you want to use the effect. This scrolling text demonstrates the specialized ScrollingBannerLabel component. ***'
+  )
+  scroll_label.frame = (20, cy, v.width-40, 30)
+  v.add_subview(scroll_label)
+  
+  c.frame = (20, cy+30, v.width-40, v.height-cy-50)
   
   initial_state()
   
@@ -316,6 +325,7 @@ if __name__ == '__main__':
     demo_btn.background_color = 'black'
     demo_btn.tint_color = 'white'
     demo_btn.action = action
+    demo_btn.font = ('<System>', 12)
     demo_btn.width, demo_btn.height = (button_width, button_height)
     return demo_btn
     
