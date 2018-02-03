@@ -1,4 +1,4 @@
-# _SCRIPTER_ - Pythonista UI animations
+# _SCRIPTER_ - Pythonista UI and Scene animations
 
 ![Logo](https://raw.githubusercontent.com/mikaelho/scripter/master/logo.jpg)
 
@@ -32,14 +32,17 @@ Another key for good animations is the use of easing functions that modify how t
     slide_value(view, 'x', 200, ease_func=bounce_out)
     
 See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function, or run `scripter-demo.py` to try out the available effects and to find the optimal duration and easing function combo for your purposes.
+
+Scripter can also be used to animate different kinds of Pythonista `scene` module Nodes, including the Scene itself. Scripter provides roughly the same functionality as `scene.Action`, but is maybe a bit more concise, and is available as an option if you want to use same syntax in both UI and Scene projects.
         
 See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
-
-_Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 
 # API
 
 * [Class: Scripter](#class-scripter)
+  * [Methods](#methods)
+  * [Properties](#properties)
+* [Class: ScrollingBannerLabel](#class-scrollingbannerlabel)
   * [Methods](#methods)
   * [Properties](#properties)
 * [Class: Vector](#class-vector)
@@ -94,17 +97,50 @@ Inherits from ui.View; constructor takes all the same arguments as ui.View.
 ## Properties
 
 
-#### `default_update_interval (get, set)`
+#### `default_update_interval (get)`
 
   The running rate for the update method. Frames per second is here considered to be just an
   alternative way of setting the update interval, and this property is linked to
   `default_fps` - change one and the other will change as well.
 
-#### `default_fps (get, set)`
+#### `default_fps (get)`
 
   The running rate for the update method. Frames per second is here considered to be just an
   alternative way of setting the update interval, and this property is linked to
   `default_update_interval` - change one and the other will change as well.
+## Class: ScrollingBannerLabel
+
+UI component that scrolls the given text indefinitely, in either direction. Will only scroll if the text is too long to fit into this component.
+  
+
+## Methods
+
+
+#### `__init__(self, **kwargs)`
+
+  In addition to normal `ui.View` arguments, you can include:
+    
+  * `text` - To be scrolled as a marquee.
+  * Label formatting arguments `font` and `text_color`.
+  * `initial_delay` - How long we wait before we start scrolling, to enable reading the beginning of the text. Default is 2 seconds.
+  * `scrolling_speed` - How fast the text moves, in points per second. Default is 100 pts/s.
+  * `to_right` - Set to True if you would like the text to scroll from the left. Default is False.
+
+#### `stop(self)`
+
+  Stops the scrolling and places the text at start. 
+
+#### `restart(self)`
+
+  Restarts the scrolling, including the initial delay, if any. 
+## Properties
+
+
+#### `text (get)`
+
+  You can change the text displayed at
+  any point after initialization by setting
+  this property. 
 ## Class: Vector
 
 Simple 2D vector class to make vector operations more convenient. If performance is a concern, you are probably better off looking at numpy.
@@ -168,23 +204,23 @@ Sample usage:
 ## Properties
 
 
-#### `x (get, set)`
+#### `x (get)`
 
   x component of the vector. 
 
-#### `y (get, set)`
+#### `y (get)`
 
   y component of the vector. 
 
-#### `magnitude (get, set)`
+#### `magnitude (get)`
 
   Length of the vector, or distance from (0,0) to (x,y). 
 
-#### `radians (get, set)`
+#### `radians (get)`
 
   Angle between the positive x axis and this vector, in radians. 
 
-#### `degrees (get, set)`
+#### `degrees (get)`
 
   Angle between the positive x axis and this vector, in degrees. 
 # Functions
@@ -193,6 +229,8 @@ Sample usage:
 #### SCRIPT MANAGEMENT
 #### `script(func)`
 
+  _Can be used with Scene Nodes._
+  
   Decorator for the animation scripts. Scripts can be functions, methods or generators.
   
   First argument of decorated functions must always be the view to be animated.
@@ -204,6 +242,8 @@ Sample usage:
 
 #### `find_scripter_instance(view)`
 
+  _Can be used with Scene Nodes._
+  
   Scripts need a "controller" ui.View that runs the update method for them. This function finds 
   or creates the controller for a view as follows:
     
@@ -211,6 +251,8 @@ Sample usage:
   2. Check if any of the subviews is a Scripter
   3. Repeat 1 and 2 up the view hierarchy of superviews
   4. If not found, create an instance of Scripter as a hidden subview of the root view
+  
+  In case of scene Nodes, search starts from `node.scene.view`.
   
   If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
   run them, you need to use this method first to find the right one.
@@ -250,10 +292,10 @@ Sample usage:
 #### `slide_color(view, attribute, end_value, **kwargs)`
 `@script`
 
-  Slide a color value. Supports same
-  arguments than `slide_value`. 
+  Slide a color value. Supports the same
+  arguments as `slide_value`. 
 
-#### `timer(view, duration, action=None)`
+#### `timer(view, duration=None, action=None)`
 `@script`
 
   Acts as a wait timer for the given duration in seconds. `view` is only used to find the 
@@ -263,16 +305,23 @@ Sample usage:
 #### `center(view, move_center_to, **kwargs)`
 `@script`
 
-  Move view center. 
+  Move view center (anchor for Scene Nodes). 
+
+#### `center_to(view, move_center_to, **kwargs)`
+`@script`
+
+  Alias for `center`. 
 
 #### `center_by(view, dx, dy, **kwargs)`
 `@script`
 
-  Adjust view center position by dx, dy. 
+  Adjust view center/anchor position by dx, dy. 
 
 #### `expand(view, **kwargs)`
 `@script`
 
+  _Not applicable for Scene Nodes._
+  
   Expands the view to fill all of its superview. 
 
 #### `fly_out(view, direction, **kwargs)`
@@ -284,12 +333,19 @@ Sample usage:
 #### `hide(view, **kwargs)`
 `@script`
 
-  Fade the view away, then set as hidden 
+  Fade the view away. 
 
 #### `move(view, x, y, **kwargs)`
 `@script`
 
-  Move to x, y. 
+  Move to x, y.
+  For UI views, this positions the top-left corner.
+  For Scene Nodes, this moves the Node `position`. 
+
+#### `move_to(view, x, y, **kwargs)`
+`@script`
+
+  Alias for `move`. 
 
 #### `move_by(view, dx, dy, **kwargs)`
 `@script`
@@ -302,16 +358,29 @@ Sample usage:
   Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. 
 
+#### `reveal_text(view, **kwargs)`
+`@script`
+
+  Reveals text one letter at a time in the given duration. View must have a `text` attribute. 
+
 #### `roll_to(view, to_center, end_right_side_up=True, **kwargs)`
 `@script`
 
   Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
   View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards. 
 
-#### `rotate(view, degrees, **kwargs)`
+#### `rotate(view, degrees, shortest=True, **kwargs)`
 `@script`
 
-  Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. Does not mix with other transformations. 
+  Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. For UI views, does not mix with other transformations.
+  
+  Optional arguments:
+    
+  * `shortest` - If set to True (default), will turn in the "right" direction. For UI views, start_value must be set to a sensible value for this to work.
+
+#### `rotate_to(view, degrees, **kwargs)`
+
+  Alias for `rotate`. 
 
 #### `rotate_by(view, degrees, **kwargs)`
 `@script`
@@ -321,7 +390,11 @@ Sample usage:
 #### `scale(view, factor, **kwargs)`
 `@script`
 
-  Scale view to a given factor in both x and y dimensions. Set start_value if not starting from 1. 
+  Scale view to a given factor in both x and y dimensions. For UI views, you need to explicitly set `start_value` if not starting from 1. 
+
+#### `scale_to(view, factor, **kwargs)`
+
+  Alias for `scale`. 
 
 #### `scale_by(view, factor, **kwargs)`
 `@script`
@@ -331,7 +404,7 @@ Sample usage:
 #### `show(view, **kwargs)`
 `@script`
 
-  Unhide view, then fade in. 
+  Slide alpha from 0 to 1. 
 
 #### `wobble(view)`
 `@script`
@@ -339,69 +412,9 @@ Sample usage:
   Little wobble of a view, intended to attract attention. 
 
 #### EASING FUNCTIONS
-#### `linear(t)`
-
-
-#### `sinusoidal(t)`
-
-
-#### `ease_in(t)`
-
-
-#### `ease_out(t)`
-
-
-#### `ease_in_out(t)`
-
-
-#### `ease_out_in(t)`
-
-
-#### `elastic_out(t)`
-
-
-#### `elastic_in(t)`
-
-
-#### `elastic_in_out(t)`
-
-
-#### `bounce_out(t)`
-
-
-#### `bounce_in(t)`
-
-
-#### `bounce_in_out(t)`
-
-
-#### `ease_back_in(t)`
-
-
-#### `ease_back_in_alt(t)`
-
-
-#### `ease_back_out(t)`
-
-
-#### `ease_back_out_alt(t)`
-
-
-#### `ease_back_in_out(t)`
-
-
-#### `ease_back_in_out_alt(t)`
-
-
 #### `mirror(ease_func, t)`
 
   Runs the given easing function to the end in half the duration, then backwards in the second half. For example, if the function provided is `linear`, this function creates a "triangle" from 0 to 1, then back to 0; if the function is `ease_in`, the result is more of a "spike".
-
-#### `mirror_ease_in(t)`
-
-
-#### `mirror_ease_in_out(t)`
-
 
 #### `oscillate(t)`
 

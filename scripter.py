@@ -1,7 +1,7 @@
 #coding: utf-8
 
 '''
-# _SCRIPTER_ - Pythonista UI animations
+# _SCRIPTER_ - Pythonista UI and Scene animations
 
 ![Logo](https://raw.githubusercontent.com/mikaelho/scripter/master/logo.jpg)
 
@@ -35,13 +35,14 @@ Another key for good animations is the use of easing functions that modify how t
     slide_value(view, 'x', 200, ease_func=bounce_out)
     
 See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function, or run `scripter-demo.py` to try out the available effects and to find the optimal duration and easing function combo for your purposes.
+
+Scripter can also be used to animate different kinds of Pythonista `scene` module Nodes, including the Scene itself. Scripter provides roughly the same functionality as `scene.Action`, but is maybe a bit more concise, and is available as an option if you want to use same syntax in both UI and Scene projects.
         
 See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
-
-_Note_: As of Sep 15, 2017, ui.View.update is only available in Pythonista 3 beta.
 '''
 
 from ui import *
+from scene import Node, Scene
 import scene_drawing
 
 from types import GeneratorType, SimpleNamespace
@@ -53,6 +54,8 @@ import time, math
 
 def script(func):
   '''
+  _Can be used with Scene Nodes._
+  
   Decorator for the animation scripts. Scripts can be functions, methods or generators.
   
   First argument of decorated functions must always be the view to be animated.
@@ -82,8 +85,13 @@ def script(func):
     
   return wrapper
  
+def isnode(view):
+  return issubclass(type(view), Node)
+ 
 def find_scripter_instance(view):
   '''
+  _Can be used with Scene Nodes._
+  
   Scripts need a "controller" ui.View that runs the update method for them. This function finds 
   or creates the controller for a view as follows:
     
@@ -92,9 +100,19 @@ def find_scripter_instance(view):
   3. Repeat 1 and 2 up the view hierarchy of superviews
   4. If not found, create an instance of Scripter as a hidden subview of the root view
   
+  In case of scene Nodes, search starts from `node.scene.view`.
+  
   If you want cancel or pause scripts, and have not explicitly created a Scripter instance to 
   run them, you need to use this method first to find the right one.
   '''
+  if isnode(view):
+    if hasattr(view, 'view'):
+      view = view.view # Scene root node
+    else:
+      if view.scene is None:
+        raise ValueError('Node must be added to a Scene before animations')
+      view = view.scene.view
+      
   while view:
     if isinstance(view, Scripter):
       return view
@@ -383,7 +401,8 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
 
 @script
 def slide_tuple(view, *args, **kwargs):
-  ''' Slide a tuple value of arbitrary length. Supports same arguments as `slide_value`. '''
+  '''
+  Slide a tuple value of arbitrary length. Supports same arguments as `slide_value`. '''
   def delta_func_for_tuple(start_value, end_value):
     return tuple((end_value[i] - start_value[i] for i in range(len(start_value))))
   def current_func_for_tuple(start_value, t_fraction, delta_value):
@@ -396,8 +415,8 @@ def slide_tuple(view, *args, **kwargs):
   
 @script
 def slide_color(view, attribute, end_value, **kwargs):
-  ''' Slide a color value. Supports same
-  arguments than `slide_value`. '''
+  ''' Slide a color value. Supports the same
+  arguments as `slide_value`. '''
   start_value = kwargs.pop('start_value', None)
   if start_value:
     start_value = parse_color(start_value)
@@ -426,17 +445,26 @@ def timer(view, duration=None, action=None):
 
 @script    
 def center(view, move_center_to, **kwargs):
-  ''' Move view center. '''
-  slide_tuple(view, 'center', move_center_to, **kwargs)
+  ''' Move view center (anchor for Scene Nodes). '''
+  attr = 'position' if isnode(view) else 'center'
+  slide_tuple(view, attr, move_center_to, **kwargs)
+  
+@script
+def center_to(view, move_center_to, **kwargs):
+  ''' Alias for `center`. '''
+  center(view, move_center_to, **kwargs)
   
 @script    
-def center_by(view, dx, dy, **kwargs):
-  ''' Adjust view center position by dx, dy. '''
-  center(view, (view.center[0] + dx, view.center[1] + dy), **kwargs)
+def center_by(view, dx, dy, **kwargs): 
+  ''' Adjust view center/anchor position by dx, dy. '''
+  cx, cy = view.position if isnode(view) else view.center
+  center(view, (cx + dx, cy + dy), **kwargs)
 
 @script
 def expand(view, **kwargs):
-  ''' Expands the view to fill all of its superview. '''
+  '''  _Not applicable for Scene Nodes._
+  
+  Expands the view to fill all of its superview. '''
   move(view, 0, 0, **kwargs)
   slide_value(view, 'width', view.superview.width, **kwargs)
   slide_value(view, 'height', view.superview.height, **kwargs)
@@ -447,97 +475,62 @@ def fly_out(view, direction, **kwargs):
   following strings: 'up', 'down', 'left', 'right'. '''
   
   (sw,sh) = get_screen_size()
-  (lx, ly, lw, lh) = convert_rect(rect=(0,0,sw,sh), to_view=view)
+  if isnode(view):
+    (lx, ly, lw, lh) = view.scene.bounds
+    attr = 'position'
+    if direction == 'up':
+      direction = 'down'
+    elif direction == 'down':
+      direction = 'up'
+  else:
+    (lx, ly, lw, lh) = convert_rect(rect=(0,0,sw,sh), to_view=view)
+    attr = 'center'
   (x,y,w,h) = view.frame
-  targets = { 'up': ('y',ly-h), 'down': ('y',lh), 'left': ('x',lx-w), 'right': ('x',lw) }
+  (cx, cy) = getattr(view, attr)
+  targets = { 'up': (cx,ly-h), 'down': (cx,lh+h), 'left': (lx-w,cy), 'right': (lw+w,cy) }
   try:
     target_coord = targets[direction]
   except KeyError:
     raise ValueError('Direction must be one of ' + str(list(targets.keys())))
-  slide_value(view, target_coord[0], target_coord[1], **kwargs)
+  slide_tuple(view, attr, target_coord, **kwargs)
 
 @script
 def hide(view, **kwargs):
-  ''' Fade the view away, then set as hidden '''  
+  ''' Fade the view away. '''  
   slide_value(view, 'alpha', 0.0, **kwargs)
-  yield
-  view.hidden = True
 
 @script    
 def move(view, x, y, **kwargs):
-  ''' Move to x, y. '''
-  slide_value(view, 'x', x, **kwargs)
-  slide_value(view, 'y', y, **kwargs)
+  ''' Move to x, y.
+  For UI views, this positions the top-left corner.
+  For Scene Nodes, this moves the Node `position`. '''
+  if isnode(view):
+    slide_tuple(view, 'position', (x,y), **kwargs)
+  else:
+    slide_value(view, 'x', x, **kwargs)
+    slide_value(view, 'y', y, **kwargs)
+  
+@script 
+def move_to(view, x, y, **kwargs):
+  ''' Alias for `move`. '''
+  move(view, x, y, **kwargs)
   
 @script    
 def move_by(view, dx, dy, **kwargs):
   ''' Adjust position by dx, dy. '''
-  slide_value(view, 'x', view.x + dx, **kwargs)
-  slide_value(view, 'y', view.y + dy, **kwargs)
+  if isnode(view):
+    slide_tuple(view, 'position', (view.position.x+dx, view.position.y+dy), **kwargs)
+  else:
+    slide_value(view, 'x', view.x + dx, **kwargs)
+    slide_value(view, 'y', view.y + dy, **kwargs)
 
 @script
 def pulse(view, color='#67cf70', **kwargs):
-  ''' Pulses the background of the view to the given color and back to the original color.
+  '''  Pulses the background of the view to the given color and back to the original color.
   Default color is a shade of green. '''
   root_func = kwargs.pop('ease_func', ease_in)
   ease_func = partial(mirror, root_func)
   slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
-
-@script
-def roll_to(view, to_center, end_right_side_up=True, **kwargs):
-  ''' Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
-  View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards. '''
-  from_center = view.center
-  roll_vector = Vector(to_center)-Vector(from_center)
-  roll_direction = 1 if roll_vector.x >= 0 else -1
-  roll_distance = roll_vector.magnitude
-  view_r = view.width/2
-  roll_degrees = roll_direction * 360 * roll_distance/(2*math.pi*view_r)
-  if end_right_side_up:
-    start_degrees = roll_direction * (360 - abs(roll_degrees) % 360)
-    view.transform = Transform.rotation(math.radians(start_degrees))
-  rotate_by(view, roll_degrees, **kwargs)
-  center(view, to_center, **kwargs)
-
-@script    
-def rotate(view, degrees, **kwargs):
-  ''' Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. Does not mix with other transformations. '''
-  start_value = math.radians(kwargs.pop('start_value', 0))
-  radians = math.radians(degrees)
-  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r), **kwargs)
-  
-@script    
-def rotate_by(view, degrees, **kwargs):
-  ''' Rotate view by given degrees. '''
-  start_value = kwargs.pop('start_value', 0)
-  radians = degrees/360*2*math.pi
-  starting_transform = view.transform
-  slide_value(view, 'transform', radians, start_value=start_value, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
-  
-@script    
-def scale(view, factor, **kwargs):
-  ''' Scale view to a given factor in both x and y dimensions. Set start_value if not starting from 1. '''
-  start_value = kwargs.pop('start_value', 1)
-  slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
-
-@script    
-def scale_by(view, factor, **kwargs):
-  ''' Scale view relative to current scale factor. '''
-  start_value = kwargs.pop('start_value', 1)
-  starting_transform = view.transform
-  slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r) if not starting_transform else starting_transform.concat(Transform.scale(r, r)), **kwargs)
-
-@script 
-def show(view, **kwargs):
-  ''' Unhide view, then fade in. '''
-  view.alpha = 0.0
-  view.hidden = False
-  slide_value(view, 'alpha', 1.0, **kwargs)
-
-@script
-def wobble(view):
-  ''' Little wobble of a view, intended to attract attention. '''
-  rotate(view, 10, duration=0.3, ease_func=oscillate)
 
 @script
 def reveal_text(view, **kwargs):
@@ -545,6 +538,99 @@ def reveal_text(view, **kwargs):
   full_text = view.text
     
   slide_value(view, 'text', len(full_text), start_value=0, map_func=lambda value: full_text[:max(0, min(len(full_text), round(value)))], **kwargs)
+
+@script
+def roll_to(view, to_center, end_right_side_up=True, **kwargs):
+  ''' Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
+  View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards. '''
+  from_center = view.position if isnode(view) else view.center
+  roll_vector = Vector(to_center)-Vector(from_center)
+  roll_direction = 1 if roll_vector.x >= 0 else -1
+  roll_distance = roll_vector.magnitude
+  view_r = view.frame[0]/2
+  roll_degrees = roll_direction * 360 * roll_distance/(2*math.pi*view_r)
+  if end_right_side_up:
+    start_degrees = roll_direction * (360 - abs(roll_degrees) % 360)
+    start_radians = math.radians(start_degrees)
+    if isnode(view):
+      view.rotation = start_radians
+    else:
+      view.transform = Transform.rotation(start_radians)
+  rotate_by(view, roll_degrees, **kwargs)
+  center(view, to_center, **kwargs)
+
+@script    
+def rotate(view, degrees, shortest=True, **kwargs):
+  ''' Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. For UI views, does not mix with other transformations.
+  
+  Optional arguments:
+    
+  * `shortest` - If set to True (default), will turn in the "right" direction. For UI views, start_value must be set to a sensible value for this to work.
+  '''
+  start_value = kwargs.pop('start_value', math.degrees(view.rotation) if isnode(view) else 0)
+  radians = math.radians(degrees)
+  start_radians = math.radians(start_value)
+  if shortest:
+    degrees = math.degrees(math.atan2(math.sin(radians-start_radians), math.cos(radians-start_radians)))
+    rotate_by(view, degrees)
+  else:
+    if isnode(view):
+      slide_value(view, 'rotation', radians, start_value=start_radians, **kwargs)
+    else:
+      slide_value(view, 'transform', radians, start_value=start_radians, map_func=lambda r: Transform.rotation(r), **kwargs)
+  
+def rotate_to(view, degrees, **kwargs):
+  ''' Alias for `rotate`. '''
+  rotate(view, degrees, **kwargs)
+  
+@script    
+def rotate_by(view, degrees, **kwargs):
+  ''' Rotate view by given degrees. '''
+  radians = math.radians(degrees)
+  if isnode(view):
+    slide_value(view, 'rotation', view.rotation+radians, start_value=view.rotation, **kwargs)
+  else:
+    starting_transform = view.transform
+    slide_value(view, 'transform', radians, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
+  
+@script    
+def scale(view, factor, **kwargs):
+  ''' Scale view to a given factor in both x and y dimensions. For UI views, you need to explicitly set `start_value` if not starting from 1. '''
+  if isnode(view):
+    start_value = kwargs.pop('start_value', view.x_scale)
+    slide_value(view, 'x_scale', factor, start_value=start_value, **kwargs)
+    slide_value(view, 'y_scale', factor, start_value=start_value, **kwargs)
+  else:
+    start_value = kwargs.pop('start_value', 1)
+    slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
+
+def scale_to(view, factor, **kwargs):
+  ''' Alias for `scale`. '''
+  scale(view, factor, **kwargs)
+
+@script    
+def scale_by(view, factor, **kwargs):
+  ''' Scale view relative to current scale factor. '''
+  if isnode(view):
+    start_value = kwargs.pop('start_value', view.x_scale)
+    end_value = start_value * factor
+    slide_value(view, 'x_scale', end_value, start_value=start_value, **kwargs)
+    slide_value(view, 'y_scale', end_value, start_value=start_value, **kwargs)
+  else:
+    start_value = kwargs.pop('start_value', 1)
+    starting_transform = view.transform
+    slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r) if not starting_transform else starting_transform.concat(Transform.scale(r, r)), **kwargs)
+
+@script 
+def show(view, **kwargs):
+  ''' Slide alpha from 0 to 1. '''
+  view.alpha = 0.0
+  slide_value(view, 'alpha', 1.0, **kwargs)
+
+@script
+def wobble(view):
+  ''' Little wobble of a view, intended to attract attention. '''
+  rotate(view, 10, shortest=False, duration=0.3, ease_func=oscillate)
 
 
 class ScrollingBannerLabel(View):
@@ -942,9 +1028,9 @@ if __name__ == '__main__':
       tv.text_color = '#4a4a4a'
       tv.frame = (2, 2, 146, 36)
       tv.flex = 'WH'
-      tv.hidden = True
+      tv.alpha = 0
       self.add_subview(tv)
-      self.hidden = True
+      #self.hidden = True
       
     @script
     def demo_script(self):
