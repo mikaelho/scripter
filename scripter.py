@@ -560,7 +560,7 @@ def roll_to(view, to_center, end_right_side_up=True, **kwargs):
   center(view, to_center, **kwargs)
 
 @script    
-def rotate(view, degrees, shortest=True, **kwargs):
+def rotate(view, degrees, shortest=False, **kwargs):
   ''' Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. For UI views, does not mix with other transformations.
   
   Optional arguments:
@@ -591,7 +591,7 @@ def rotate_by(view, degrees, **kwargs):
     slide_value(view, 'rotation', view.rotation+radians, start_value=view.rotation, **kwargs)
   else:
     starting_transform = view.transform
-    slide_value(view, 'transform', radians, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
+    slide_value(view, 'transform', radians, start_value=0, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
   
 @script    
 def scale(view, factor, **kwargs):
