@@ -197,6 +197,9 @@ class Scripter(View):
     run_at_least_once = True
     while run_at_least_once or len(self.activate) > 0 or len(self.deactivate) > 0:
       run_at_least_once = False
+      for script in self.cancel_queue:
+        self._process_cancel(script)
+      self.cancel_queue = set()
       for gen in self.activate:
         self.active_gens.add(gen)
       for gen in self.deactivate:
@@ -248,6 +251,9 @@ class Scripter(View):
   def cancel(self, script):
     ''' Cancels any ongoing animations and
     sub-scripts for the given script. '''
+    self.cancel_queue.add(script)
+    
+  def _process_cancel(self, script):
     to_cancel = set()
     to_cancel.add(script)
     parent_gen = self.parent_gens[script]
@@ -293,6 +299,7 @@ class Scripter(View):
     self.activate = set()
     self.deactivate = set()
     self.running = False
+    self.cancel_queue = set()
   
   @staticmethod
   def _cubic(params, t):
@@ -447,18 +454,18 @@ def timer(view, duration=None, action=None):
 def center(view, move_center_to, **kwargs):
   ''' Move view center (anchor for Scene Nodes). '''
   attr = 'position' if isnode(view) else 'center'
-  slide_tuple(view, attr, move_center_to, **kwargs)
+  return slide_tuple(view, attr, move_center_to, **kwargs)
   
 @script
 def center_to(view, move_center_to, **kwargs):
   ''' Alias for `center`. '''
-  center(view, move_center_to, **kwargs)
+  return center(view, move_center_to, **kwargs)
   
 @script    
 def center_by(view, dx, dy, **kwargs): 
   ''' Adjust view center/anchor position by dx, dy. '''
   cx, cy = view.position if isnode(view) else view.center
-  center(view, (cx + dx, cy + dy), **kwargs)
+  return center(view, (cx + dx, cy + dy), **kwargs)
 
 @script
 def expand(view, **kwargs):
@@ -468,6 +475,7 @@ def expand(view, **kwargs):
   move(view, 0, 0, **kwargs)
   slide_value(view, 'width', view.superview.width, **kwargs)
   slide_value(view, 'height', view.superview.height, **kwargs)
+  yield 
 
 @script
 def fly_out(view, direction, **kwargs):
@@ -492,12 +500,12 @@ def fly_out(view, direction, **kwargs):
     target_coord = targets[direction]
   except KeyError:
     raise ValueError('Direction must be one of ' + str(list(targets.keys())))
-  slide_tuple(view, attr, target_coord, **kwargs)
+  return slide_tuple(view, attr, target_coord, **kwargs)
 
 @script
 def hide(view, **kwargs):
   ''' Fade the view away. '''  
-  slide_value(view, 'alpha', 0.0, **kwargs)
+  return slide_value(view, 'alpha', 0.0, **kwargs)
 
 @script    
 def move(view, x, y, **kwargs):
@@ -509,11 +517,12 @@ def move(view, x, y, **kwargs):
   else:
     slide_value(view, 'x', x, **kwargs)
     slide_value(view, 'y', y, **kwargs)
+  yield 
   
 @script 
 def move_to(view, x, y, **kwargs):
   ''' Alias for `move`. '''
-  move(view, x, y, **kwargs)
+  return move(view, x, y, **kwargs)
   
 @script    
 def move_by(view, dx, dy, **kwargs):
@@ -523,6 +532,7 @@ def move_by(view, dx, dy, **kwargs):
   else:
     slide_value(view, 'x', view.x + dx, **kwargs)
     slide_value(view, 'y', view.y + dy, **kwargs)
+  yield
 
 @script
 def pulse(view, color='#67cf70', **kwargs):
@@ -530,14 +540,14 @@ def pulse(view, color='#67cf70', **kwargs):
   Default color is a shade of green. '''
   root_func = kwargs.pop('ease_func', ease_in)
   ease_func = partial(mirror, root_func)
-  slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
+  return slide_color(view, 'background_color', color, ease_func=ease_func, **kwargs)
 
 @script
 def reveal_text(view, **kwargs):
   ''' Reveals text one letter at a time in the given duration. View must have a `text` attribute. '''
   full_text = view.text
     
-  slide_value(view, 'text', len(full_text), start_value=0, map_func=lambda value: full_text[:max(0, min(len(full_text), round(value)))], **kwargs)
+  return slide_value(view, 'text', len(full_text), start_value=0, map_func=lambda value: full_text[:max(0, min(len(full_text), round(value)))], **kwargs)
 
 @script
 def roll_to(view, to_center, end_right_side_up=True, **kwargs):
@@ -558,6 +568,7 @@ def roll_to(view, to_center, end_right_side_up=True, **kwargs):
       view.transform = Transform.rotation(start_radians)
   rotate_by(view, roll_degrees, **kwargs)
   center(view, to_center, **kwargs)
+  yield
 
 @script    
 def rotate(view, degrees, shortest=False, **kwargs):
@@ -575,23 +586,23 @@ def rotate(view, degrees, shortest=False, **kwargs):
     rotate_by(view, degrees)
   else:
     if isnode(view):
-      slide_value(view, 'rotation', radians, start_value=start_radians, **kwargs)
+      return slide_value(view, 'rotation', radians, start_value=start_radians, **kwargs)
     else:
-      slide_value(view, 'transform', radians, start_value=start_radians, map_func=lambda r: Transform.rotation(r), **kwargs)
+      return slide_value(view, 'transform', radians, start_value=start_radians, map_func=lambda r: Transform.rotation(r), **kwargs)
   
 def rotate_to(view, degrees, **kwargs):
   ''' Alias for `rotate`. '''
-  rotate(view, degrees, **kwargs)
+  return rotate(view, degrees, **kwargs)
   
 @script    
 def rotate_by(view, degrees, **kwargs):
   ''' Rotate view by given degrees. '''
   radians = math.radians(degrees)
   if isnode(view):
-    slide_value(view, 'rotation', view.rotation+radians, start_value=view.rotation, **kwargs)
+    return slide_value(view, 'rotation', view.rotation+radians, start_value=view.rotation, **kwargs)
   else:
     starting_transform = view.transform
-    slide_value(view, 'transform', radians, start_value=0, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
+    return slide_value(view, 'transform', radians, start_value=0, map_func=lambda r: Transform.rotation(r) if not starting_transform else starting_transform.concat(Transform.rotation(r)), **kwargs)
   
 @script    
 def scale(view, factor, **kwargs):
@@ -603,10 +614,11 @@ def scale(view, factor, **kwargs):
   else:
     start_value = kwargs.pop('start_value', 1)
     slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
+  yield
 
 def scale_to(view, factor, **kwargs):
   ''' Alias for `scale`. '''
-  scale(view, factor, **kwargs)
+  return scale(view, factor, **kwargs)
 
 @script    
 def scale_by(view, factor, **kwargs):
@@ -620,17 +632,18 @@ def scale_by(view, factor, **kwargs):
     start_value = kwargs.pop('start_value', 1)
     starting_transform = view.transform
     slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r) if not starting_transform else starting_transform.concat(Transform.scale(r, r)), **kwargs)
+  yield
 
 @script 
 def show(view, **kwargs):
   ''' Slide alpha from 0 to 1. '''
   view.alpha = 0.0
-  slide_value(view, 'alpha', 1.0, **kwargs)
+  return slide_value(view, 'alpha', 1.0, **kwargs)
 
 @script
 def wobble(view):
   ''' Little wobble of a view, intended to attract attention. '''
-  rotate(view, 10, shortest=False, duration=0.3, ease_func=oscillate)
+  return rotate(view, 10, shortest=False, duration=0.3, ease_func=oscillate)
 
 
 class ScrollingBannerLabel(View):
