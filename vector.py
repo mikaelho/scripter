@@ -41,18 +41,21 @@ class Vector (list):
 
   abs_tol = 1e-10
 
-  def __init__(self, *args, **kwargs):
-    x = kwargs.pop('x', None)
-    y = kwargs.pop('y', None)
-
-    if x and y:
-      self.append(x)
-      self.append(y)
-    elif len(args) == 2:
-      self.append(args[0])
-      self.append(args[1])
+  def __init__(self, *args, **kwargs):    
+    if len(args) + len(kwargs) == 0:
+      self.append(0)
+      self.append(0)
     else:
-      super().__init__(*args, **kwargs)
+      x = kwargs.pop('x', None)
+      y = kwargs.pop('y', None)
+      if x and y:
+        self.append(x)
+        self.append(y)
+      elif len(args) == 2:
+        self.append(args[0])
+        self.append(args[1])
+      else:
+        super().__init__(*args, **kwargs)
 
   @property
   def x(self):
@@ -166,9 +169,13 @@ class Vector (list):
         yield other
         
   def rounded_steps_to(self, other, step_magnitude=1.0):
-    ''' As `steps_to`, but returns points rounded to the nearest integer. '''
-    for step in self.steps_to(other):
-      yield round(step)
+    ''' As `steps_to`, but returns unique points rounded to the nearest integer. '''
+    previous = Vector(0,0)
+    for step in self.steps_to(other, step_magnitude):
+      rounded = round(step)
+      if rounded != previous:
+        previous = rounded
+        yield rounded
     
 
 if __name__ == '__main__':
@@ -192,5 +199,5 @@ if __name__ == '__main__':
   
   assert list(Vector(1, 1).steps_to(Vector(3, 3))) == [[1.7071067811865475, 1.7071067811865475], [2.414213562373095, 2.414213562373095], [3, 3]]
   assert list(Vector(1, 1).steps_to(Vector(-1, 1))) == [[0, 1], [-1, 1]]
-  assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [2, 2], [3, 3]]
+  assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [3, 3]]
 
