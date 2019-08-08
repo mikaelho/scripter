@@ -118,6 +118,17 @@ class Vector (list):
     ''' Linear distance between this vector and another. '''
     return (Vector(other) - self).magnitude
 
+  def projection_to(self, other):
+    ''' Vector projection of this vector to another vector. '''
+    result_vector = Vector(other)
+    scale_factor = other.dot_product(self)/(other.magnitude**2)
+    result_vector.magnitude *= scale_factor
+    return result_vector
+    
+  def rejection_from(self, other):
+    ''' The perpendicular vector that remains when we take out the projected component. '''
+    return self - self.projection_to(other)
+
   @property
   def magnitude(self):
     ''' Length of the vector, or distance from (0,0) to (x,y). '''
@@ -151,7 +162,7 @@ class Vector (list):
 
   @degrees.setter
   def degrees(self, d):
-    self.radians = math.radians(d)
+    self.radians = math.radians(d) 
     
   def steps_to(self, other, step_magnitude=1.0):
     """ Generator that returns points on the line between this and the other point, with each step separated by `step_magnitude`. Does not include the starting point. """
@@ -200,4 +211,8 @@ if __name__ == '__main__':
   assert list(Vector(1, 1).steps_to(Vector(3, 3))) == [[1.7071067811865475, 1.7071067811865475], [2.414213562373095, 2.414213562373095], [3, 3]]
   assert list(Vector(1, 1).steps_to(Vector(-1, 1))) == [[0, 1], [-1, 1]]
   assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [3, 3]]
-
+  
+  v4 = Vector(0,1)
+  v5 = Vector(5,5)
+  assert v4.projection_to(v5) == (0.5, 0.5)
+  assert v4.rejection_from(v5) == (-0.5, 0.5)
