@@ -645,6 +645,66 @@ def wobble(view):
   ''' Little wobble of a view, intended to attract attention. '''
   return rotate(view, 10, shortest=False, duration=0.3, ease_func=oscillate)
 
+@script
+def wait_for_tap(view):
+    ''' yields until the view is tapped.
+    
+    Overlays the given view with a temporary transparent view. '''
+    
+    class WaitForTap(View):
+    
+        def __init__(self, target, **kwargs):
+            super().__init__(**kwargs)
+            self.tapped = False
+            self.background_color = (0,0,0,0.0001)
+            self.frame=target.bounds
+            target.add_subview(self)
+                
+        def touch_ended(self, touch):
+            self.tapped = True
+    
+    t = WaitForTap(view)
+    while not t.tapped:
+        yield
+        
+# Generate convenience functions
+
+animation_attributes = (
+    (slide_value, (
+        'alpha',
+        'corner_radius',
+        'height',
+        'row_height',
+        'value',
+        'width',
+        'x',
+        'y',
+    )),
+    (slide_color, (
+        'background_color',
+        'bar_tint_color',
+        'border_color',
+        'text_color',
+        'tint_color',
+        'title_color',
+    )),
+    (slide_tuple, (
+        'bounds',
+        'content_inset',
+        'content_offset',
+        'content_size',
+        'frame',
+        'scroll_indicator_insets',
+        'selected_range',
+    ))
+)
+
+for animation_function, keys in animation_attributes:
+    for key in keys:
+        def f(func, attr, view, value, **kwargs):
+            func(view, attr, value, **kwargs)
+        globals()[key] = partial(f, animation_function, key)
+
 
 class ScrollingBannerLabel(View):
   ''' UI component that scrolls the given text indefinitely, in either direction. Will only scroll if the text is too long to fit into this component.
@@ -724,7 +784,7 @@ class ScrollingBannerLabel(View):
     timer(self, self.initial_delay)
     yield
     while True:
-      slide_tuple(self, 'bounds', (self._direction * self._text_width, 0, self.width, self.height), duration=duration)
+      bounds(self, (self._direction * self._text_width, 0, self.width, self.height), duration=duration)
       yield
       self.bounds = (0, 0, self.width, self.height)
       
@@ -1059,7 +1119,8 @@ if __name__ == '__main__':
       # Transformations
       self.l.text = 'Rotating'
       rotate(self, -720, ease_func=ease_back_in_out, duration=1.5)
-      slide_color(self, 'background_color', 'green', duration=2.0)
+      #slide_color(self, 'background_color', 'green', duration=2.0)
+      background_color(self, 'green', duration=2.0)
       slide_color(self.l, 'text_color', 'white', duration=2.0)
       yield 'wait'
       self.l.text = 'Move two'
@@ -1075,8 +1136,8 @@ if __name__ == '__main__':
       self.l.text = 'Custom'
       # Driving custom View.draw animation
       self.c.hidden = False
-      slide_color(self, 'background_color', 'transparent')
-      slide_color(self.l, 'text_color', 'black')
+      background_color(self, 'transparent')
+      text_color(self.l, 'black')
       v.start_point = SimpleNamespace(x=self.x+15, y=self.y+20)
       set_value(v, 'axes_counter', range(1, 210, 3), func=v.trigger_refresh)
       yield 'wait'
@@ -1084,22 +1145,22 @@ if __name__ == '__main__':
       slide_value(v, 'curve_point_y', 200, start_value=1, ease_func=ease_back_in_out, map_func=v.trigger_refresh, duration=2.0)
       yield 'wait'
       
-      slide_value(self, 'x', self.x+200, duration=2.0)
-      slide_value(self, 'y', self.y-200, ease_func=ease_back_in_out, duration=2.0)
+      x(self, self.x+200, duration=2.0)
+      y(self, self.y-200, ease_func=ease_back_in_out, duration=2.0)
       yield 'wait'
       
       self.l.text = 'Bounce'
       self.c.hidden = True
-      slide_color(self, 'background_color', 'green')
-      slide_color(self.l, 'text_color', 'white')
-      slide_value(self, 'width', 76)      
-      slide_value(self, 'height', 76)
-      slide_value(self, 'corner_radius', 38)
+      background_color(self, 'green')
+      text_color(self.l, 'white')
+      width(self, 76)      
+      height(self, 76)
+      corner_radius(self, 38)
       v.hide_curve = True
       v.set_needs_display()
       yield
-      slide_value(self, 'x', v.start_point.x, ease_func='easeOut', duration=2.0)
-      slide_value(self, 'y', v.start_point.y-self.height, ease_func=scene_drawing.curve_bounce_out, duration=2.0)
+      x(self, v.start_point.x, ease_func='easeOut', duration=2.0)
+      y(self, v.start_point.y-self.height, ease_func=scene_drawing.curve_bounce_out, duration=2.0)
       yield 1.0
       
       self.l.text = 'Roll'
@@ -1113,15 +1174,13 @@ if __name__ == '__main__':
       v.set_needs_display()
       self.c.hidden = True
       expand(self)
-      slide_value(self, 'corner_radius', 0)
-      slide_color(self, 'background_color', 'white')
-      #self.border_color = 'green'
-      #self.border_width = 2
+      corner_radius(self, 0)
+      background_color(self, 'white')
       show(self.tv)
-      slide_tuple(self.tv, 'content_offset', (0,0))
+      content_offset(self.tv, (0,0))
       yield 1.0
       
-      slide_tuple(self.tv, 'content_offset', (0, self.tv.content_size[1]), duration=20)
+      content_offset(self.tv, (0, self.tv.content_size[1]), duration=20)
       self.end_fade()
   
     @script
