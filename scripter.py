@@ -39,6 +39,10 @@ See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/
 Scripter can also be used to animate different kinds of Pythonista `scene` module Nodes, including the Scene itself. Scripter provides roughly the same functionality as `scene.Action`, but is maybe a bit more concise, and is available as an option if you want to use same syntax in both UI and Scene projects.
         
 See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
+
+There are convenience functions, not separately documented, corresponding to animatable attributes of ui views. For example, you can animate the `ui.View.background_color` attribute with:
+    
+    background_color(view, 'black')
 '''
 
 from ui import *
@@ -647,9 +651,8 @@ def wobble(view):
 
 @script
 def wait_for_tap(view):
-    ''' yields until the view is tapped.
-    
-    Overlays the given view with a temporary transparent view. '''
+    ''' Overlays the given view with a temporary transparent view, and
+    yields until the view is tapped. '''
     
     class WaitForTap(View):
     

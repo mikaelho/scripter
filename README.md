@@ -37,6 +37,10 @@ Scripter can also be used to animate different kinds of Pythonista `scene` modul
         
 See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
 
+There are convenience functions, not separately documented, corresponding to animatable attributes of ui views. For example, you can animate the `ui.View.background_color` attribute with:
+    
+    background_color(view, 'black')
+
 # API
 
 * [Class: Scripter](#class-scripter)
@@ -369,7 +373,7 @@ Sample usage:
   Roll the view to a target position given by the `to_center` tuple. If `end_right_side_up` is true, view starting angle is adjusted so that the view will end up with 0 rotation at the end, otherwise the view will start as-is, and end in an angle determined by the roll.
   View should be round for the rolling effect to make sense. Imaginary rolling surface is below the view - or to the left if rolling directly downwards. 
 
-#### `rotate(view, degrees, shortest=True, **kwargs)`
+#### `rotate(view, degrees, shortest=False, **kwargs)`
 `@script`
 
   Rotate view to an absolute angle. Set start_value if not starting from 0. Positive number rotates clockwise. For UI views, does not mix with other transformations.
@@ -410,6 +414,12 @@ Sample usage:
 `@script`
 
   Little wobble of a view, intended to attract attention. 
+
+#### `wait_for_tap(view)`
+`@script`
+
+  Overlays the given view with a temporary transparent view, and
+  yields until the view is tapped. 
 
 #### EASING FUNCTIONS
 #### `mirror(ease_func, t)`
