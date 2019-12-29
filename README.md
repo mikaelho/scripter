@@ -4,15 +4,19 @@
 
 # Quick start
 
-In order to start using the animation effects, just import scripter and call the effects as functions:
+In order to start using the animation effects, just import scripter and call
+the effects as functions:
 
     from scripter import *
     
     hide(my_button)
     
-Effects expect an active UI view as the first argument. Effects run for a default duration of 0.5 seconds, unless otherwise specified with a `duration` argument.
+Effects expect an active UI view as the first argument. Effects run for a
+default duration of 0.5 seconds, unless otherwise specified with a `duration` 
+argument.
 
-If you want to create a more complex animation from the effects provided, combine them in a script:
+If you want to create a more complex animation from the effects provided,
+combine them in a script:
   
     @script
     def my_effect(view):
@@ -21,23 +25,44 @@ If you want to create a more complex animation from the effects provided, combin
       yield
       hide(view, duration=2.0)
       
-Scripts control the order of execution with `yield` statements. Here movement and a red pulsing highlight happen at the same time. After both actions are completed, view fades away slowly, in 2 seconds.
+Scripts control the order of execution with `yield` statements. Here movement
+and a red pulsing highlight happen at the same time. After both actions are
+completed, view fades away slowly, in 2 seconds.
 
-As the view provided as the first argument can of course be `self` or `sender`, scripts fit naturally as custom `ui.View` methods or `action` functions. 
+As the view provided as the first argument can of course be `self` or `sender`,
+scripts fit naturally as custom `ui.View` methods or `action` functions. 
 
-As small delays are often needed for natural-feeling animations, you can append a number after a `yield` statement, to suspend the execution of the script for that duration, or `yield 'wait'` for the default duration.
+As small delays are often needed for natural-feeling animations, you can append
+a number after a `yield` statement, to suspend the execution of the script for
+that duration, or `yield 'wait'` for the default duration.
 
-Another key for good animations is the use of easing functions that modify how the value progresses from starting value to the target value. Easing functions support creating different kinds of accelerating, bouncing and springy effects. Easing functions can be added as an argument to scripts:
+Another key for good animations is the use of easing functions that modify how
+the value progresses from starting value to the target value. Easing functions
+support creating different kinds of accelerating, bouncing and springy effects.
+Easing functions can be added as an argument to scripts:
   
     slide_value(view, 'x', 200, ease_func=bounce_out)
     
-See this [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg) to pick the right function, or run `scripter-demo.py` to try out the available effects and to find the optimal duration and easing function combo for your purposes.
+See this
+[reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg)
+to pick the right function, or run `scripter-demo.py` to try out the available
+effects and to find the optimal duration and easing function combo for your purposes.
 
-Scripter can also be used to animate different kinds of Pythonista `scene` module Nodes, including the Scene itself. Scripter provides roughly the same functionality as `scene.Action`, but is maybe a bit more concise, and is available as an option if you want to use same syntax in both UI and Scene projects.
+You can change the default speed of all animations by setting 
+`Scripter.default_duration`.
+
+Scripter can also be used to animate different kinds of Pythonista `scene`
+module Nodes, including the Scene itself. Scripter provides roughly the same 
+functionality as `scene.Action`, but is maybe a bit more concise, and is
+available as an option if you want to use same syntax in both UI and Scene
+projects.
         
-See the API documentation for individual effects and how to roll your own with `set_value`, `slide_value` and `timer`.
+See the API documentation for individual effects and how to roll your own with 
+`set_value`, `slide_value` and `timer`.
 
-There are convenience functions, not separately documented, corresponding to animatable attributes of ui views. For example, you can animate the `ui.View.background_color` attribute with:
+There are also convenience functions, not separately documented, corresponding
+to all animatable attributes of ui views. For example, you can animate the 
+`ui.View.background_color` attribute with:
     
     background_color(view, 'black')
 
@@ -151,8 +176,10 @@ Simple 2D vector class to make vector operations more convenient. If performance
 
 Supports the following operations:
   
-* Initialization from two arguments, two keyword  arguments (`x` and `y`), tuple, list, or another Vector.
-* Equality and unequality comparisons to other vectors. For floating point numbers, equality tolerance is 1e-10.
+* Initialization from two arguments, two keyword  arguments (`x` and `y`),
+tuple, list, or another Vector.
+* Equality and unequality comparisons to other vectors. For floating point
+numbers, equality tolerance is 1e-10.
 * `abs`, `int` and `round`
 * Addition and in-place addition
 * Subtraction
@@ -178,10 +205,6 @@ Sample usage:
     assert v3 == [-2, 0]
     v3.degrees = -90
     assert v3 == [0, -2]
-    
-    assert list(Vector(1, 1).steps_to(Vector(3, 3))) == [[1.7071067811865475, 1.7071067811865475], [2.414213562373095, 2.414213562373095], [3, 3]]
-    assert list(Vector(1, 1).steps_to(Vector(-1, 1))) == [[0, 1], [-1, 1]]
-    assert list(Vector(1, 1).rounded_steps_to(Vector(3, 3))) == [[2, 2], [2, 2], [3, 3]]
 
 ## Methods
 
