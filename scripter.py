@@ -14,9 +14,10 @@ the effects as functions:
 
     hide(my_button)
 
-Effects expect an active UI view as the first argument. Effects run for a
-default duration of 0.5 seconds, unless otherwise specified with a `duration`
-argument.
+Effects depend on an active root UI view for the update method that runs them.
+Effects run for a default duration of 0.5 seconds, unless otherwise specified
+with a `duration` argument. You can also change the global default by changing
+the `scripter.default_duration` value.
 
 If you want to create a more complex animation from the effects provided,
 combine them in a script:
@@ -24,16 +25,14 @@ combine them in a script:
     @script
     def my_effect(view):
       move(view, 50, 200)
-      pulse(view, 'red')
+      background_color(view, 'red')
       yield
       hide(view, duration=2.0)
 
-Scripts control the order of execution with `yield` statements. Here movement
-and a red pulsing highlight happen at the same time. After both actions are
-completed, view fades away slowly, in 2 seconds.
-
-As the view provided as the first argument can of course be `self` or `sender`,
-scripts fit naturally as custom `ui.View` methods or `action` functions.
+Scripts control the order of execution with `yield` statements. Here the
+movement
+and background changing to red happen at the same time. After both actions are
+completed, view fades away slowly.
 
 As small delays are often needed for natural-feeling animations, you can append
 a number after a `yield` statement, to suspend the execution of the script for
@@ -50,9 +49,6 @@ See this
 [reference](https://raw.githubusercontent.com/mikaelho/scripter/master/ease-funcs.jpg)
 to pick the right function, or run `scripter-demo.py` to try out the available
 effects and to find the optimal duration and easing function combo for your purposes.
-
-You can change the default speed of all animations by setting
-`Scripter.default_duration`.
 
 Scripter can also be used to animate different kinds of Pythonista `scene`
 module Nodes, including the Scene itself. Scripter provides roughly the same
@@ -73,17 +69,39 @@ to all animatable attributes of ui views. For example, you can animate the
 from ui import *
 from scene import Node, Scene
 import scene_drawing
-import objc_util, ctypes
+import objc_util
 
+import ctypes
 from types import GeneratorType, SimpleNamespace
+import sys
 from numbers import Number
 from functools import partial, wraps, lru_cache
 from contextlib import contextmanager
 import time, math
+import inspect
+
+
+default_duration = 0.5
+
 
 #docgen: Script management
 
-def script(func):
+
+def _arg_wrap(func):
+    """ Decorator to decorate decorators to support optional arguments. """
+
+    @wraps(func)
+    def new_decorator(*args, **kwargs):
+        if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+            return func(args[0])
+        else:
+            return lambda realf: func(realf, *args, **kwargs)
+
+    return new_decorator
+    
+
+@_arg_wrap
+def script(func, flow_control=False):
     '''
     _Can be used with Scene Nodes._
 
@@ -98,20 +116,23 @@ def script(func):
     execution of the parent script.
     '''
     @wraps(func)
-    def wrapper(view, *args, **kwargs):
-        gen = func(view, *args, **kwargs)
-        if not isinstance(gen, GeneratorType):
-            return gen
-        scr = find_scripter_instance(view)
-        scr.view_for_gen[gen] = view
-        scr.parent_gens[gen] = scr.current_gen
-        if scr.current_gen != 'root':
-            scr.standby_gens.setdefault(scr.current_gen, set())
-            scr.standby_gens[scr.current_gen].add(gen)
-            scr.deactivate.add(scr.current_gen)
-        scr.activate.add(gen)
-        scr.update_interval = scr.default_update_interval
-        scr.running = True
+    def wrapper(*args, **kwargs):
+
+        def _func_wrapper(f, *args, **kwargs):
+            return (yield f(*args, **kwargs))
+            
+        if inspect.isgeneratorfunction(func):
+            gen = func(*args, **kwargs)
+        else:
+            gen = _func_wrapper(func, *args, **kwargs)
+            gen.__name__ = func.__name__
+            
+        if flow_control:
+            gen.__name__ = '_scripter_flow_controller'
+            
+        scr = find_scripter_instance()
+        
+        scr.initialize(gen)
 
         return gen
 
@@ -122,11 +143,23 @@ def isfinished(gen):
     script has run to the end. '''
     return gen.gi_frame is None
 
+def ispaused(gen):
+    scr = find_scripter_instance()
+    to_process = [gen]
+    while len(to_process):
+        gen = to_process.pop()
+        if gen in scr.paused:
+            return True
+        elif gen in scr.standby_gens:
+            to_process.extend(scr.standby_gens[gen])
+    return False
+
 def isnode(view):
     ''' Returns True if argument is an instance of a subclass of scene.Node. '''
     return issubclass(type(view), Node)
 
-def find_scripter_instance(view):
+@lru_cache(maxsize=1)
+def find_scripter_instance():
     '''
     _Can be used with Scene Nodes._
 
@@ -144,7 +177,7 @@ def find_scripter_instance(view):
     Scripter instance to run them, you need to use this method first to find the
     right one.
     '''
-
+    view = find_root_view()
     if isnode(view):
         if hasattr(view, 'view'):
             view = view.view # Scene root node
@@ -232,40 +265,83 @@ class Scripter(View):
     def default_fps(self, value):
         self._default_fps = value
         self._default_update_interval = 1/value
+        
+    def initialize(self, gen):
+        self.parent_gens[gen] = self.current_gen
+        if self.current_gen != 'root':
+            self.standby_gens.setdefault(
+                self.current_gen, set()
+            ).add(gen)
+            self.deactivate.add(self.current_gen)
+        self.activate.add(gen)
+        self.update_interval = self.default_update_interval
+        self.running = True
 
     def update(self):
         '''
-        Main Scripter animation loop handler, called by the Puthonista UI loop and never by your
-        code directly.
+        Main Scripter animation loop handler, called by the Puthonista UI loop
+        and never by your code directly.
 
         This method:
 
         * Activates all newly called scripts and suspends their parents.
-        * Calls all active scripts, which will run to their next `yield` or until completion.
-        * As a convenience feature, if a `yield` returns `'wait'` or a specific duration,
+        * Calls all active scripts, which will run to their next `yield` or 
+        until completion.
+        * As a convenience feature, if a `yield` returns `'wait'` or a 
+        specific duration,
         kicks off a child `timer` script to wait for that period of time.
         * Cleans out completed scripts.
         * Resumes parent scripts whose children have all completed.
         * Sets `update_interval` to 0 if all scripts have completed.
         '''
         run_at_least_once = True
-        while run_at_least_once or len(self.activate) > 0 or len(self.deactivate) > 0:
+        while (
+            run_at_least_once or 
+            len(self.activate) > 0 or len(self.deactivate) > 0
+        ):
             run_at_least_once = False
             for script in self.cancel_queue:
                 self._process_cancel(script)
             self.cancel_queue = set()
+            to_postpone = set()
+            for gen in self.activate:
+                if gen.__name__ == '_scripter_flow_controller':
+                    to_postpone.update(gen.gi_frame.f_locals['gens'])
+            self.activate.difference_update(to_postpone)
             for gen in self.activate:
                 self.active_gens.add(gen)
+            self.activate = set()
             for gen in self.deactivate:
                 self.active_gens.remove(gen)
-            self.activate = set()
             self.deactivate = set()
+            for gen in self.pause_queue:
+                to_process = [gen]
+                while len(to_process):
+                    gen_to_pause = to_process.pop()
+                    if gen_to_pause in self.active_gens:
+                        self.active_gens.remove(gen_to_pause)
+                        self.paused.add(gen_to_pause)
+                        print('PAUSED', gen_to_pause)
+                    elif gen_to_pause in self.standby_gens:
+                        to_process.extend(self.standby_gens[gen_to_pause])
+            self.pause_queue = set()
+            for gen in self.play_queue:
+                to_process = [gen]
+                while len(to_process):
+                    gen_to_play = to_process.pop()
+                    if gen_to_play in self.paused:
+                        self.paused.remove(gen_to_play)
+                        self.active_gens.add(gen_to_play)
+                    elif gen_to_play in self.standby_gens:
+                        to_process.extend(self.standby_gens[gen_to_play])
+            self.play_queue = set()
             gen_to_end = []
             for gen in self.active_gens:
                 self.current_gen = gen
                 wait_time = self.should_wait.pop(gen, None)
                 if wait_time is not None:
-                    timer(self.view_for_gen[gen], wait_time)
+                    #timer(self.view_for_gen[gen], wait_time)
+                    timer(wait_time)
                 else:
                     wait_time = None
                     try:
@@ -293,20 +369,6 @@ class Scripter(View):
             self.update_interval = 0.0
             self.running = False
 
-    def pause_play_all(self):
-        ''' Pause or play all animations. '''
-        self.update_interval = 0 if self.update_interval > 0 else self.default_update_interval
-        self.running = self.update_interval > 0
-        if not self.running:
-            self.pause_start_time = time.time()
-        else:
-            self.time_paused = time.time() - self.pause_start_time
-
-    def cancel(self, script):
-        ''' Cancels any ongoing animations and
-        sub-scripts for the given script. '''
-        self.cancel_queue.add(script)
-
     def _process_cancel(self, script):
         to_cancel = set()
         to_cancel.add(script)
@@ -332,28 +394,50 @@ class Scripter(View):
         for gen in to_cancel:
             if gen == self.current_gen:
                 self.currrent_gen = parent_gen
-            del self.view_for_gen[gen]
             del self.parent_gens[gen]
             self.activate.discard(gen)
             self.deactivate.discard(gen)
             self.active_gens.discard(gen)
             if gen in self.standby_gens:
                 del self.standby_gens[gen]
+            self.paused.discard(gen)
 
     def cancel_all(self):
         ''' Initializes all internal structures.
         Used at start and to cancel all running scripts.
         '''
         self.current_gen = 'root'
-        self.view_for_gen = {}
         self.should_wait = {}
         self.parent_gens = {}
         self.active_gens = set()
         self.standby_gens = {}
+        self.paused = set()
         self.activate = set()
         self.deactivate = set()
         self.running = False
+        self.play_queue = set()
+        self.pause_queue = set()
         self.cancel_queue = set()
+
+    def pause_play_all(self):
+        ''' Pause or play all animations. '''
+        self.update_interval = 0 if self.update_interval > 0 else self.default_update_interval
+        self.running = self.update_interval > 0
+        if not self.running:
+            self.pause_start_time = time.time()
+        else:
+            self.time_paused = time.time() - self.pause_start_time
+
+    def pause(self, script):
+        self.pause_queue.add(script)
+        
+    def play(self, script):
+        self.play_queue.add(script)
+
+    def cancel(self, script):
+        ''' Cancels any ongoing animations and
+        sub-scripts for the given script. '''
+        self.cancel_queue.add(script)
 
     @staticmethod
     def _cubic(params, t):
@@ -381,22 +465,50 @@ class Scripter(View):
             try:
                 u = ease_func_params[params]
             except KeyError:
-                raise ValueError('Easing function name must be one of the following: ' + ', '.join(list(ease_func_params)))
+                raise ValueError('Easing function name must be one of: ' +
+                ', '.join(list(ease_func_params)))
         else:
             u = params
         return u[0]*(1-t)**3 + 3*u[1]*(1-t)**2*t + 3*u[2]*(1-t)*t**2 + u[3]*t**3
 
-def cancel(view, handle):
-    scr = find_scripter_instance(view)
-    scr.cancel(handle)
+def pause(gen):
+    scr = find_scripter_instance()
+    scr.pause(gen)
+    
+def play(gen):
+    scr = find_scripter_instance()
+    scr.play(gen)
+
+def cancel(gen):
+    scr = find_scripter_instance()
+    scr.cancel(gen)
+    
+@script(flow_control=True)
+def queue(*gens):
+    scr = find_scripter_instance()
+    if any([scr.parent_gens[gen] == 'root' for gen in gens]):
+        raise RuntimeError('queue function used outside a script')
+    for gen in gens:
+        scr.initialize(gen)
+        while not isfinished(gen):
+            yield
+    
+@script(flow_control=True)
+def group(*gens):
+    scr = find_scripter_instance()
+    if any([scr.parent_gens[gen] == 'root' for gen in gens]):
+        raise RuntimeError('group function used outside a script')
+    for gen in gens:
+        scr.initialize(gen)
+    yield
 
 #docgen: Animation primitives
 
 @script
 def set_value(view, attribute, value, func=None):
     '''
-    Generator that sets the `attribute` to a `value` once, or several times if the value itself is a
-    generator or an iterator.
+    Generator that sets the `attribute` to a `value` once, or several times
+    if the value itself is a generator or an iterator.
 
     Optional keyword parameters:
 
@@ -417,7 +529,10 @@ def set_value(view, attribute, value, func=None):
         setattr(view, attribute, func(value))
 
 @script
-def slide_value(view, attribute, end_value, target=None, start_value=None, duration=None, delta_func=None, ease_func=None, current_func=None, map_func=None, side_func=None):
+def slide_value(
+    view, attribute, end_value, start_value=None,
+    duration=None, delta_func=None, ease_func=None,
+    current_func=None, map_func=None, side_func=None):
     '''
     Generator that "slides" the `value` of an
     `attribute` to an `end_value` in a given duration.
@@ -432,8 +547,7 @@ def slide_value(view, attribute, end_value, target=None, start_value=None, durat
     * `map_func` - Used to translate the current value to something else, e.g. an angle to a Transform.rotation.
     * `side_func` - Called without arguments each time after the main value has been set. Useful for side effects.
     '''
-    scr = find_scripter_instance(view)
-    duration = duration or scr.default_duration
+    duration = duration or default_duration
     start_value = start_value if start_value is not None else getattr(view, attribute)
 
     delta_func = delta_func if callable(delta_func) else lambda start_value, end_value: end_value - start_value
@@ -489,21 +603,26 @@ def slide_color(view, attribute, end_value, **kwargs):
     return slide_tuple(view, attribute, end_value, start_value=start_value, **kwargs)
 
 @script
-def timer(view, duration=None, action=None):
-    ''' Acts as a wait timer for the given duration in seconds. `view` is only used to find the
-    controlling Scripter instance. Optional action function is called every cycle. '''
+def timer(duration=None, action=None, fraction=None):
+    ''' Acts as a wait timer for the given duration in seconds.
+    Optional action function is called every cycle.
+    Optional `fraction` function is called every cycle with the fraction 0-1 
+    of the total duration elapsed. '''
 
-    scr = find_scripter_instance(view)
-    duration = duration or scr.default_duration
+    scr = find_scripter_instance()
+    duration = duration or default_duration
     start_time = time.time()
     dt = 0
     while dt < duration:
         if action: action()
+        if fraction:
+            fraction(dt/duration)
         yield
         if scr.time_paused > 0:
             start_time += scr.time_paused
         dt = time.time() - start_time
-
+    if fraction:
+        fraction(1.0)
 
 #docgen: Animation effects
 
@@ -532,7 +651,7 @@ def expand(view, **kwargs):
     move(view, 0, 0, **kwargs)
     slide_value(view, 'width', view.superview.width, **kwargs)
     slide_value(view, 'height', view.superview.height, **kwargs)
-    yield
+    #yield
 
 @script
 def fly_out(view, direction, **kwargs):
@@ -568,6 +687,32 @@ def future(future):
         if future.exception() is not None:
             raise future.exception()
     return wait_for_done(find_root_view(), future)
+
+@script
+def gradient(view, bg_color='black', highlight_color='#727272', mirror=False, **kwargs):
+
+    CAGradientLayer = objc_util.ObjCClass('CAGradientLayer')
+    
+    objc_background = objc_util.UIColor.colorWithRed_green_blue_alpha_(
+        *parse_color(bg_color)
+    ).CGColor()
+    objc_highlight = objc_util.UIColor.colorWithRed_green_blue_alpha_(
+        *parse_color(highlight_color)
+    ).CGColor()
+    
+    layer = view.objc_instance.layer()
+    grlayer = CAGradientLayer.layer()
+    grlayer.frame = layer.bounds()
+    grlayer.setColors_([objc_background, objc_highlight, objc_background])
+    layer.insertSublayer_atIndex_(grlayer, 0)
+    
+    def set_highlight_position(fraction):
+        scaled = -0.5 + 2 * fraction
+        grlayer.locations = [-0.5, fraction, 1.5]
+        
+    duration = kwargs.pop('duration', default_duration)
+    timer(duration, fraction=set_highlight_position)
+    #yield
 
 @script
 def hide(view, **kwargs):
@@ -681,7 +826,7 @@ def scale(view, factor, **kwargs):
     else:
         start_value = kwargs.pop('start_value', 1)
         slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r), **kwargs)
-    yield
+    #yield
 
 def scale_to(view, factor, **kwargs):
     ''' Alias for `scale`. '''
@@ -699,7 +844,7 @@ def scale_by(view, factor, **kwargs):
         start_value = kwargs.pop('start_value', 1)
         starting_transform = view.transform
         slide_value(view, 'transform', factor, start_value=start_value, map_func=lambda r: Transform.scale(r, r) if not starting_transform else starting_transform.concat(Transform.scale(r, r)), **kwargs)
-    yield
+    #yield
 
 @script
 def show(view, **kwargs):
@@ -783,7 +928,9 @@ def while_not_finished(gen, scr, view, *args, **kwargs):
 
 
 class ScrollingBannerLabel(View):
-    ''' UI component that scrolls the given text indefinitely, in either direction. Will only scroll if the text is too long to fit into this component.
+    ''' UI component that scrolls the given text indefinitely, in either
+    direction. Will only scroll if the text is too long to fit into this
+    component.
     '''
 
     def __init__(self, **kwargs):
@@ -802,10 +949,11 @@ class ScrollingBannerLabel(View):
         self._direction = -1 if kwargs.pop('to_right', False) else 1
         if 'font' in kwargs: self.kwargs['font'] = kwargs.pop('font')
         if 'text_color' in kwargs: self.kwargs['text_color'] = kwargs.pop('text_color')
+        text = kwargs.pop('text', None)
 
         super().__init__(**kwargs)
 
-        self.text = kwargs.pop('text', None)
+        self.text = text
 
     @property
     def text(self):
@@ -823,8 +971,7 @@ class ScrollingBannerLabel(View):
 
     def stop(self):
         ''' Stops the scrolling and places the text at start. '''
-        scr = find_scripter_instance(self)
-        scr.cancel(self._scroller)
+        cancel(self._scroller)
         self.bounds = (0, 0, self.width, self.height)
 
     def restart(self):
@@ -857,12 +1004,18 @@ class ScrollingBannerLabel(View):
     @script
     def _start_scrolling(self):
         duration = self._text_width/self.scrolling_speed
-        timer(self, self.initial_delay)
+        timer(self.initial_delay)
         yield
         while True:
             bounds(self, (self._direction * self._text_width, 0, self.width, self.height), duration=duration)
             yield
             self.bounds = (0, 0, self.width, self.height)
+
+    def touch_ended(self, t):
+        if ispaused(self._scroller):
+            play(self._scroller)
+        else:
+            pause(self._scroller)
 
 
 #docgen: Easing functions
@@ -1155,6 +1308,29 @@ if __name__ == '__main__':
     v = DemoBackground()
     v.background_color = 'white'
     v.present('fullscreen')
+    
+    @script
+    def dummy(count):
+        print(f'bang {count}')
+        
+    @script
+    def launch_group():
+        queue(
+            dummy('two'),
+            group(
+                queue(
+                    dummy('three'),
+                    dummy('four')
+                ),
+                queue(
+                    dummy('five'),
+                    dummy('six')
+                )
+            )
+        )
+        print('set')
+        
+    launch_group()
 
     class Demo(View):
 
@@ -1282,22 +1458,22 @@ if __name__ == '__main__':
     v.add_subview(s)
 
     now_running = s.demo_script()
-    scr = find_scripter_instance(s)
+    scr = find_scripter_instance()
 
     def pause_action(sender):
         scr.pause_play_all()
-        pause.title = 'Pause' if scr.running else 'Play'
+        pause_button.title = 'Pause' if scr.running else 'Play'
 
-    pause = Button(title='Pause')
-    pause.frame = (v.width-85, 60, 75, 40)
-    pause.background_color = 'black'
-    pause.tint_color = 'white'
-    pause.action = pause_action
-    v.add_subview(pause)
+    pause_button = Button(title='Pause')
+    pause_button.frame = (v.width-85, 60, 75, 40)
+    pause_button.background_color = 'black'
+    pause_button.tint_color = 'white'
+    pause_button.action = pause_action
+    v.add_subview(pause_button)
 
     def cancel_demo(sender):
         scr.cancel(now_running)
-        hide(pause)
+        hide(pause_button)
         hide(sender)
         # or could just use
         # scr.cancel_all()
@@ -1309,6 +1485,8 @@ if __name__ == '__main__':
     b.tint_color = 'white'
     b.action = cancel_demo
     v.add_subview(b)
+    
+    gradient(b, duration=2.0)
 
     m = ScrollingBannerLabel(text='This is a scripter test, with an info text that is too long to fit on screen at once.', font=('Futura', 24), text_color='green', frame=(40, v.height-50, v.width-80, 40))
     v.add_subview(m)
