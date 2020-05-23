@@ -561,6 +561,8 @@ def slide_value(
     delta_value = delta_func(start_value, end_value)
     start_time = time.time()
     dt = 0
+    
+    scr = find_scripter_instance()
     scaling = True
     while scaling:
         if dt < duration:
