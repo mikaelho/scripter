@@ -82,7 +82,12 @@ import inspect
 
 
 default_duration = 0.5
+scripter_view = None
 
+def set_scripter_view(view):
+    global scripter_view
+    
+    scripter_view = view
 
 #docgen: Script management
 
@@ -208,13 +213,19 @@ def find_root_view():
     """
     Locates the first `present`ed view.
     """
+    global scripter_view
+    
+    if scripter_view is not None:
+        return scripter_view
+    
     SUIView_PY3 = objc_util.ObjCClass('SUIView_PY3')
     candidates =  [objc_util.UIApplication.sharedApplication().windows()[0]]
     while len(candidates) > 0:
         objc_view = candidates.pop()
         if objc_view.isKindOfClass_(SUIView_PY3.ptr):
-            return objc_view.pyObject(
+            scripter_view = objc_view.pyObject(
                 argtypes=[], restype=ctypes.py_object)
+            return scripter_view
         candidates.extend(objc_view.subviews())
     raise Exception('Root view not found')
 
@@ -295,6 +306,7 @@ class Scripter(View):
         * Sets `update_interval` to 0 if all scripts have completed.
         '''
         run_at_least_once = True
+        
         while (
             run_at_least_once or 
             len(self.activate) > 0 or len(self.deactivate) > 0

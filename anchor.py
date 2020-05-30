@@ -203,6 +203,7 @@ if __name__ == '__main__':
     v = ui.View(
         background_color='black',
     )
+    set_scripter_view(v)
     
     menu_view = ui.Label(
         text='MENU',
