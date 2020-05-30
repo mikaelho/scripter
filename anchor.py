@@ -6,7 +6,7 @@ import textwrap
 from scripter import *
 
 
-_rules_string = """
+_anchor_rules_spec = """
 left:
     type: leading
     target:
@@ -37,14 +37,32 @@ top:
     source:
         regular: source.y
         container: source.bounds.y
+bottom:
+    type: trailing
+    target:
+        attribute: target.y
+        same: value - target.height
+        different: value - target.height - gap
+        flex: height
+    source:
+        regular: source.frame.max_y
+        container: source.bounds.max_y
 center_x:
     type: neutral
     target:
         attribute: target.x
         same: value - target.width / 2
     source:
-        regular: view.center[0]
-        container: view.bounds.center()[0]
+        regular: source.center[0]
+        container: source.bounds.center()[0]
+center:
+    type: neutral
+    target:
+        attribute: target.center
+        same: value
+    source:
+        regular: source.center
+        container: source.bounds.center()
 width:
     type: neutral
     target:
@@ -93,15 +111,23 @@ class At:
                 if target_at.view.superview == self.source_at.view
                 else self.REGULAR
             )
-            self.same = self.SAME if (
-                _rules[self.source_prop]['type'] == self.NEUTRAL or
-                _rules[self.target_prop]['type'] == self.NEUTRAL or
-                _rules[self.source_prop]['type'] == 
-                _rules[self.target_prop]['type']
-            ) else self.DIFFERENT
+            source_type = _rules[self.source_prop]['type']
+            target_type = _rules[self.target_prop]['type']
             
-            if self.type == self.CONTAINER and self.same != self.NEUTRAL:
+            #print(source_type, target_type)
+            
+            self.same = self.SAME if any([
+                source_type == self.NEUTRAL,
+                target_type == self.NEUTRAL,
+                source_type == target_type,
+            ]) else self.DIFFERENT
+            
+            #print(self.same)
+            
+            if (self.type == self.CONTAINER and
+            self.NEUTRAL not in (source_type, target_type)):
                 self.same = self.SAME if self.same == self.DIFFERENT else self.DIFFERENT
+                
             
         def start_script(self):
             source_value = _rules[self.source_prop]['source'][self.type]
@@ -162,6 +188,9 @@ class At:
     left = _prop('left')
     right = _prop('right')
     top = _prop('top')
+    bottom = _prop('bottom')
+    center = _prop('center')
+    center_x = _prop('center_x')
     
 
 def _parse_rules(rules):    
@@ -192,13 +221,25 @@ def _parse_rules(rules):
                 raise RuntimeError(f'Cannot parse line {i}', error)
     return rule_dict
     
-_rules = _parse_rules(_rules_string)
+_rules = _parse_rules(_anchor_rules_spec)
 
     
 if __name__ == '__main__':
     
     import time
     import ui
+    
+    class Marker(ui.View):
+        
+        def __init__(self, superview):
+            super().__init__(
+                width=30,
+                height=30,
+                corner_radius=15,
+                background_color='grey'
+            )
+            superview.add_subview(self)
+            
     
     v = ui.View(
         background_color='black',
@@ -253,9 +294,14 @@ if __name__ == '__main__':
 
     At(menu_view).right = At(main_view).left
     
+    m1 = Marker(main_view)
+    At(m1).top = At(main_view).top
+    At(m1).center_x = At(main_view).center_x
+    
+    m2 = Marker(main_view)
+    At(m2).center = At(main_view).center
+    
     v.present('fullscreen', 
         animated=False
     )
-    
-    #x(main_view, menu_view.width)
 
