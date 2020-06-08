@@ -1,5 +1,6 @@
 
 import json
+import math
 import re
 import textwrap
 
@@ -53,8 +54,16 @@ center_x:
         attribute: target.x
         same: value - target.width / 2
     source:
-        regular: source.center[0]
-        container: source.bounds.center()[0]
+        regular: source.center.x
+        container: source.bounds.center().x
+center_y:
+    type: neutral
+    target:
+        attribute: target.y
+        same: value - target.height / 2
+    source:
+        regular: source.center.y
+        container: source.bounds.center().y
 center:
     type: neutral
     target:
@@ -66,11 +75,27 @@ center:
 width:
     type: neutral
     target:
-        attribute: width
+        attribute: target.width
         same: value
     source:
-        regular: width
-        container: width - 2 * gap
+        regular: source.width
+        container: source.bounds.width - 2 * gap
+height:
+    type: neutral
+    target:
+        attribute: target.height
+        same: value
+    source:
+        regular: source.height
+        container: source.height - 2 * gap
+heading:
+    type: neutral
+    target:
+        attribute: target._scripter_at._heading
+        same: direction(target, source, value)
+    source:
+        regular: source._scripter_at._heading
+        container: source._scripter_at._heading
 """
 
 template = """
@@ -78,8 +103,8 @@ attr:
     type: 
     target:
         attribute: 
-        leading: 
-        trailing: 
+        same: 
+        different: 
         flex: 
     source:
         regular: 
@@ -143,9 +168,9 @@ class At:
                 f'''\
                 @script  #(run_last=True)
                 def anchor_runner(source, target):
+                    gap = {At.gap}
                     while True:
                         value = {source_value}
-                        gap = {At.gap}
                         target_value = {target_value}
                         if {target_attribute} != target_value:
                             {target_attribute} = target_value
@@ -157,6 +182,7 @@ class At:
             )
             
             exec(textwrap.dedent(script_str))
+            
     
     def __new__(cls, view):
         try:
@@ -164,33 +190,78 @@ class At:
         except AttributeError:
             at = super().__new__(cls)
             at.view = view
+            at.__heading = 0
+            at.heading_adjustment = 0
             at.running_scripts = {}
             view._scripter_at = at
             return at
 
-    def _prop(attribute):
+    def _prop(attribute, flex=False):
         p = property(
             lambda self:
                 partial(At._getter, self, attribute)(),
             lambda self, value:
-                partial(At._setter, self, attribute, value)()
+                partial(At._setter, self, attribute, flex, value)()
         )
         return p
 
     def _getter(self, attr_string):
         return At.Anchor(self, attr_string)
 
-    def _setter(self, attr_string, *value):
-        source_anchor = value[0]
+    def _setter(self, attr_string, flex, value):
+        source_anchor = value
         source_anchor.set_target(self, attr_string)
+        source_anchor.flex = flex
         source_anchor.start_script()
+            
+    # ---------------- PROPERTIES
             
     left = _prop('left')
     right = _prop('right')
     top = _prop('top')
     bottom = _prop('bottom')
+    
+    left_flex = _prop('left', True)
+    right_flex = _prop('right', True)
+    top_flex = _prop('top', True)
+    bottom_flex = _prop('bottom', True)
+    
     center = _prop('center')
     center_x = _prop('center_x')
+    center_y = _prop('center_y')
+    width = _prop('width')
+    height = _prop('height')
+    heading = _prop('heading')
+    
+    
+    @property
+    def _heading(self):
+        return self.__heading
+        
+    @_heading.setter
+    def _heading(self, value):
+        self.__heading = value
+        self.view.transform = ui.Transform.rotation(
+            value + self.heading_adjustment)
+        
+    
+# Helper functions
+    
+
+    
+def direction(target, source, value):
+    """
+    Calculate the heading if given a center
+    """
+    try:
+        if len(value) == 2:
+            source_center = ui.convert_point(value, source.superview)
+            target_center = ui.convert_point(target.center, target.superview)
+            delta = source_center - target_center
+            value = math.atan2(delta.y, delta.x)
+    except TypeError:
+        pass
+    return value
     
 
 def _parse_rules(rules):    
@@ -231,15 +302,34 @@ if __name__ == '__main__':
     
     class Marker(ui.View):
         
-        def __init__(self, superview):
+        def __init__(self, superview, radius=15, background_color='grey'):
             super().__init__(
-                width=30,
-                height=30,
-                corner_radius=15,
-                background_color='grey'
+                background_color=background_color
             )
+            self._prev_size = self.width
+            self.radius = radius
             superview.add_subview(self)
             
+        def layout(self):
+            if self.width != self._prev_size:
+                dim = self.width
+            else:
+                dim = self.height
+            self.height = self.width = dim
+            self.corner_radius = self.width/2
+        
+        @property
+        def radius(self):
+            return self.width / 2
+            
+        @radius.setter
+        def radius(self, value):
+            self.width = value * 2
+            
+    class Mover(Marker):
+        
+        def touch_moved(self, t):
+            self.center += t.location - t.prev_location
     
     v = ui.View(
         background_color='black',
@@ -259,9 +349,9 @@ if __name__ == '__main__':
     )
     
     main_view = ui.Label(
-        text='MAIN',
+        text='',
         text_color='white',
-        alignment=ui.ALIGN_CENTER,
+        alignment=ui.ALIGN_RIGHT,
         border_color='white',
         border_width=1,
         #background_color='red',
@@ -298,8 +388,28 @@ if __name__ == '__main__':
     At(m1).top = At(main_view).top
     At(m1).center_x = At(main_view).center_x
     
-    m2 = Marker(main_view)
-    At(m2).center = At(main_view).center
+    bottom_bar = ui.View(
+        background_color='grey'
+    )
+    main_view.add_subview(bottom_bar)
+
+    bb = At(bottom_bar)
+    mv = At(main_view)
+    bb.width = mv.width
+    bb.bottom = mv.bottom
+    bb.left = mv.left
+    
+    pointer = ui.ImageView(image=ui.Image('iow:ios7_arrow_thin_down_32'))
+    main_view.add_subview(pointer)
+    At(pointer).heading_adjustment = - math.pi / 2
+    At(pointer).center = mv.center
+    
+    mover = Mover(
+        main_view,
+        background_color='darkred')
+        
+    mover.center = (100,100)
+    At(pointer).heading = At(mover).center
     
     v.present('fullscreen', 
         animated=False
