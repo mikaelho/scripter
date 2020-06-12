@@ -12,9 +12,8 @@ left:
     type: leading
     target:
         attribute: target.x
-        same: value
-        different: value + gap
-        flex: width
+        value: value
+        different: value
     source:
         regular: source.x
         container: source.bounds.x
@@ -22,9 +21,8 @@ right:
     type: trailing
     target:
         attribute: target.x
-        same: value - target.width
-        different: value - target.width - gap
-        flex: width
+        value: value - target.width
+        different: value - target.width
     source:
         regular: source.frame.max_x
         container: source.bounds.max_x
@@ -32,9 +30,8 @@ top:
     type: leading
     target:
         attribute: target.y
-        same: value
-        different: value + gap
-        flex: height
+        value: value
+        different: value
     source:
         regular: source.y
         container: source.bounds.y
@@ -42,9 +39,44 @@ bottom:
     type: trailing
     target:
         attribute: target.y
-        same: value - target.height
-        different: value - target.height - gap
-        flex: height
+        value: value - target.height
+        different: value - target.height
+    source:
+        regular: source.frame.max_y
+        container: source.bounds.max_y
+left_flex:
+    type: leading
+    target:
+        attribute: (target.x, target.width)
+        value: (value, target.width - (value - target.x))
+        different: value
+    source:
+        regular: source.x
+        container: source.bounds.x
+right_flex:
+    type: trailing
+    target:
+        attribute: target.width
+        value: target.width + (value - (target.x + target.width))
+        different: target.width + (value - (target.x + target.width))
+    source:
+        regular: source.frame.max_x
+        container: source.bounds.max_x
+top_flex:
+    type: leading
+    target:
+        attribute: target.y
+        value: value
+        different: value
+    source:
+        regular: source.y
+        container: source.bounds.y
+bottom_flex:
+    type: trailing
+    target:
+        attribute: target.height
+        value: target.height + (value - (target.y + target.height))
+        different: target.height + (value - (target.y + target.height))
     source:
         regular: source.frame.max_y
         container: source.bounds.max_y
@@ -52,7 +84,7 @@ center_x:
     type: neutral
     target:
         attribute: target.x
-        same: value - target.width / 2
+        value: value - target.width / 2
     source:
         regular: source.center.x
         container: source.bounds.center().x
@@ -60,7 +92,7 @@ center_y:
     type: neutral
     target:
         attribute: target.y
-        same: value - target.height / 2
+        value: value - target.height / 2
     source:
         regular: source.center.y
         container: source.bounds.center().y
@@ -68,7 +100,7 @@ center:
     type: neutral
     target:
         attribute: target.center
-        same: value
+        value: value
     source:
         regular: source.center
         container: source.bounds.center()
@@ -76,23 +108,23 @@ width:
     type: neutral
     target:
         attribute: target.width
-        same: value
+        value: value
     source:
         regular: source.width
-        container: source.bounds.width - 2 * gap
+        container: source.bounds.width - 2 * border_gap
 height:
     type: neutral
     target:
         attribute: target.height
-        same: value
+        value: value
     source:
         regular: source.height
-        container: source.height - 2 * gap
+        container: source.height - 2 * border_gap
 heading:
     type: neutral
     target:
         attribute: target._scripter_at._heading
-        same: direction(target, source, value)
+        value: direction(target, source, value)
     source:
         regular: source._scripter_at._heading
         container: source._scripter_at._heading
@@ -154,10 +186,15 @@ class At:
             self.NEUTRAL not in (source_type, target_type)):
                 self.same = self.SAME if self.same == self.DIFFERENT else self.DIFFERENT
                 
+            self.effective_gap = ''
+            if self.same == self.DIFFERENT:
+                self.effective_gap = (
+                    f'+ {At.gap}' if target_type == self.LEADING
+                    else f'- {At.gap}')              
             
         def start_script(self):
             source_value = _rules[self.source_prop]['source'][self.type]
-            target_value = _rules[self.target_prop]['target'][self.same]
+            target_value = _rules[self.target_prop]['target']['value']
             target_attribute = _rules[self.target_prop]['target']['attribute']
             
             previous_runner = self.target_at.running_scripts.pop(
@@ -165,24 +202,36 @@ class At:
             if previous_runner:
                 cancel(previous_runner)
             
+            scripts = self.target_at.running_scripts
+            border_gap_str = (
+                f'border_gap = {At.gap}'
+                if 'border_gap' in source_value
+                else ''
+            )
+            
             script_str = (
                 f'''\
+                # --- {self.target_prop}
                 @script  #(run_last=True)
-                def anchor_runner(source, target):
-                    gap = {At.gap}
+                def anchor_runner(source, target, scripts):
+                    { border_gap_str } 
                     while True:
                         value = {source_value} {self.modifiers}
-                        target_value = {target_value}
+                        target_value = {target_value} {self.effective_gap}
                         if {target_attribute} != target_value:
                             {target_attribute} = target_value
                         yield
                         
                 self.target_at.running_scripts[self.target_prop] = \
-                    anchor_runner(self.source_at.view, self.target_at.view)
+                    anchor_runner(
+                        self.source_at.view, 
+                        self.target_at.view,
+                        self.target_at.running_scripts)
                 '''
             )
-            
-            exec(textwrap.dedent(script_str))
+            run_script = textwrap.dedent(script_str)
+            print(run_script)
+            exec(run_script)
             
         def __add__(self, other):
             self.modifiers += f'+ {other}'
@@ -207,6 +256,7 @@ class At:
         def __pow__ (self, other, modulo=None):
             self.modifiers += f'** {other}'
             return self
+    
     
     def __new__(cls, view):
         try:
