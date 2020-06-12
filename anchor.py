@@ -127,6 +127,7 @@ class At:
         def __init__(self, source_at, source_prop):
             self.source_at = source_at
             self.source_prop = source_prop
+            self.modifiers = ''
             
         def set_target(self, target_at, target_prop):
             self.target_at = target_at
@@ -170,7 +171,7 @@ class At:
                 def anchor_runner(source, target):
                     gap = {At.gap}
                     while True:
-                        value = {source_value}
+                        value = {source_value} {self.modifiers}
                         target_value = {target_value}
                         if {target_attribute} != target_value:
                             {target_attribute} = target_value
@@ -183,6 +184,29 @@ class At:
             
             exec(textwrap.dedent(script_str))
             
+        def __add__(self, other):
+            self.modifiers += f'+ {other}'
+            return self
+            
+        def __sub__(self, other):
+            self.modifiers += f'- {other}'
+            return self
+            
+        def __mul__(self, other):
+            self.modifiers += f'* {other}'
+            return self
+            
+        def __div__(self, other):
+            self.modifiers += f'/ {other}'
+            return self
+            
+        def __mod__(self, other):
+            self.modifiers += f'% {other}'
+            return self
+            
+        def __pow__ (self, other, modulo=None):
+            self.modifiers += f'** {other}'
+            return self
     
     def __new__(cls, view):
         try:
@@ -385,7 +409,7 @@ if __name__ == '__main__':
     At(menu_view).right = At(main_view).left
     
     m1 = Marker(main_view)
-    At(m1).top = At(main_view).top
+    At(m1).top = At(main_view).top + 100
     At(m1).center_x = At(main_view).center_x
     
     bottom_bar = ui.View(
@@ -414,4 +438,3 @@ if __name__ == '__main__':
     v.present('fullscreen', 
         animated=False
     )
-
