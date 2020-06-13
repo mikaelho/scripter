@@ -13,7 +13,6 @@ left:
     target:
         attribute: target.x
         value: value
-        different: value
     source:
         regular: source.x
         container: source.bounds.x
@@ -22,7 +21,6 @@ right:
     target:
         attribute: target.x
         value: value - target.width
-        different: value - target.width
     source:
         regular: source.frame.max_x
         container: source.bounds.max_x
@@ -31,7 +29,6 @@ top:
     target:
         attribute: target.y
         value: value
-        different: value
     source:
         regular: source.y
         container: source.bounds.y
@@ -40,7 +37,6 @@ bottom:
     target:
         attribute: target.y
         value: value - target.height
-        different: value - target.height
     source:
         regular: source.frame.max_y
         container: source.bounds.max_y
@@ -49,7 +45,6 @@ left_flex:
     target:
         attribute: (target.x, target.width)
         value: (value, target.width - (value - target.x))
-        different: value
     source:
         regular: source.x
         container: source.bounds.x
@@ -58,16 +53,14 @@ right_flex:
     target:
         attribute: target.width
         value: target.width + (value - (target.x + target.width))
-        different: target.width + (value - (target.x + target.width))
     source:
         regular: source.frame.max_x
         container: source.bounds.max_x
 top_flex:
     type: leading
     target:
-        attribute: target.y
-        value: value
-        different: value
+        attribute: (target.y, target.height)
+        value: (value, target.height - (value - target.y))
     source:
         regular: source.y
         container: source.bounds.y
@@ -76,7 +69,6 @@ bottom_flex:
     target:
         attribute: target.height
         value: target.height + (value - (target.y + target.height))
-        different: target.height + (value - (target.y + target.height))
     source:
         regular: source.frame.max_y
         container: source.bounds.max_y
@@ -193,34 +185,21 @@ class At:
                     else f'- {At.gap}')              
             
         def start_script(self):
-            source_value = _rules[self.source_prop]['source'][self.type]
-            target_value = _rules[self.target_prop]['target']['value']
-            target_attribute = _rules[self.target_prop]['target']['attribute']
-            
             previous_runner = self.target_at.running_scripts.pop(
                 self.target_prop, None)
             if previous_runner:
                 cancel(previous_runner)
             
-            scripts = self.target_at.running_scripts
-            border_gap_str = (
-                f'border_gap = {At.gap}'
-                if 'border_gap' in source_value
-                else ''
-            )
+            #scripts = self.target_at.running_scripts
+            
+            update_code = self.get_update_code()
             
             script_str = (
                 f'''\
                 # --- {self.target_prop}
                 @script  #(run_last=True)
                 def anchor_runner(source, target, scripts):
-                    { border_gap_str } 
-                    while True:
-                        value = {source_value} {self.modifiers}
-                        target_value = {target_value} {self.effective_gap}
-                        if {target_attribute} != target_value:
-                            {target_attribute} = target_value
-                        yield
+                    while True: {update_code}
                         
                 self.target_at.running_scripts[self.target_prop] = \
                     anchor_runner(
@@ -230,8 +209,49 @@ class At:
                 '''
             )
             run_script = textwrap.dedent(script_str)
+            #print(self.target_prop, self.get_opposite())
             print(run_script)
             exec(run_script)
+            
+        def get_update_code(self):
+            source_prop = self.source_prop
+            target_prop = self.target_prop
+            opposite_prop = self.get_opposite(target_prop)
+            
+            if opposite_prop:
+                flex_prop = f'{target_prop}_flex'
+                return f'''
+                        if '{opposite_prop}' in scripts:
+                            {self.get_code(source_prop, flex_prop)}
+                        else:{self.get_code(source_prop, target_prop)}'''
+            else:
+                return self.get_code(source_prop, target_prop)
+            
+        def get_code(self, source_prop, target_prop):
+            source_value = _rules[source_prop]['source'][self.type]
+            target_value = _rules[target_prop]['target']['value']
+            target_attribute = _rules[target_prop]['target']['attribute']
+            
+            source_value = source_value.replace('border_gap', str(At.gap))
+            
+            return f'''
+                            value = {source_value} {self.modifiers}
+                            target_value = {target_value} {self.effective_gap}
+                            if {target_attribute} != target_value:
+                                {target_attribute} = target_value
+                            yield'''
+            
+        def get_opposite(self, prop):
+            opposites = (
+                {'left', 'right'},
+                {'top', 'bottom'},
+            )
+            for pair in opposites:
+                try:
+                    pair.remove(prop)
+                    return pair.pop()
+                except KeyError: pass
+            return None
             
         def __add__(self, other):
             self.modifiers += f'+ {other}'
