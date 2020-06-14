@@ -4,6 +4,8 @@ import math
 import re
 import textwrap
 
+from functools import partialmethod
+
 from scripter import *
 
 
@@ -16,6 +18,7 @@ left:
     source:
         regular: source.x
         container: source.bounds.x
+        safe: safe.origin.x
 right:
     type: trailing
     target:
@@ -24,6 +27,7 @@ right:
     source:
         regular: source.frame.max_x
         container: source.bounds.max_x
+        safe: safe.origin.x + safe.size.width
 top:
     type: leading
     target:
@@ -32,6 +36,7 @@ top:
     source:
         regular: source.y
         container: source.bounds.y
+        safe: safe.origin.y
 bottom:
     type: trailing
     target:
@@ -40,38 +45,27 @@ bottom:
     source:
         regular: source.frame.max_y
         container: source.bounds.max_y
+        safe: safe.origin.y + safe.size.height
 left_flex:
     type: leading
     target:
         attribute: (target.x, target.width)
         value: (value, target.width - (value - target.x))
-    source:
-        regular: source.x
-        container: source.bounds.x
 right_flex:
     type: trailing
     target:
         attribute: target.width
         value: target.width + (value - (target.x + target.width))
-    source:
-        regular: source.frame.max_x
-        container: source.bounds.max_x
 top_flex:
     type: leading
     target:
         attribute: (target.y, target.height)
         value: (value, target.height - (value - target.y))
-    source:
-        regular: source.y
-        container: source.bounds.y
 bottom_flex:
     type: trailing
     target:
         attribute: target.height
         value: target.height + (value - (target.y + target.height))
-    source:
-        regular: source.frame.max_y
-        container: source.bounds.max_y
 center_x:
     type: neutral
     target:
@@ -80,6 +74,7 @@ center_x:
     source:
         regular: source.center.x
         container: source.bounds.center().x
+        safe: source.bounds.center().x
 center_y:
     type: neutral
     target:
@@ -88,6 +83,7 @@ center_y:
     source:
         regular: source.center.y
         container: source.bounds.center().y
+        safe: source.bounds.center().y
 center:
     type: neutral
     target:
@@ -96,6 +92,7 @@ center:
     source:
         regular: source.center
         container: source.bounds.center()
+        safe: source.bounds.center()
 width:
     type: neutral
     target:
@@ -104,6 +101,7 @@ width:
     source:
         regular: source.width
         container: source.bounds.width - 2 * border_gap
+        safe: safe.size.width - 2 * border_gap
 height:
     type: neutral
     target:
@@ -111,7 +109,8 @@ height:
         value: value
     source:
         regular: source.height
-        container: source.height - 2 * border_gap
+        container: source.bounds.height - 2 * border_gap
+        safe: safe.size.height - 2 * border_gap
 heading:
     type: neutral
     target:
@@ -120,29 +119,18 @@ heading:
     source:
         regular: source._scripter_at._heading
         container: source._scripter_at._heading
-"""
-
-template = """
-attr:
-    type: 
-    target:
-        attribute: 
-        same: 
-        different: 
-        flex: 
-    source:
-        regular: 
-        container: 
+        safe: source._scripter_at._heading
 """
 
 
 class At:
     
     gap = 8  # Apple Standard gap
+    safe = True  # Avoid iOS UI elements
     
     class Anchor:
         
-        REGULAR, CONTAINER = 'regular', 'container'
+        REGULAR, CONTAINER, SAFE = 'regular', 'container', 'safe'
         
         SAME, DIFFERENT, NEUTRAL = 'same', 'different', 'neutral'
         
@@ -156,11 +144,15 @@ class At:
         def set_target(self, target_at, target_prop):
             self.target_at = target_at
             self.target_prop = target_prop
-            self.type = (
-                self.CONTAINER
-                if target_at.view.superview == self.source_at.view
-                else self.REGULAR
-            )
+            
+            if target_at.view.superview == self.source_at.view:
+                if At.safe:
+                    self.type = self.SAFE
+                else:
+                    self.type = self.CONTAINER
+            else:
+                self.type = self.REGULAR
+            
             source_type = _rules[self.source_prop]['type']
             target_type = _rules[self.target_prop]['type']
             
@@ -174,7 +166,7 @@ class At:
             
             #print(self.same)
             
-            if (self.type == self.CONTAINER and
+            if (self.type in (self.CONTAINER, self.SAFE) and
             self.NEUTRAL not in (source_type, target_type)):
                 self.same = self.SAME if self.same == self.DIFFERENT else self.DIFFERENT
                 
@@ -196,7 +188,7 @@ class At:
             
             script_str = (
                 f'''\
-                # --- {self.target_prop}
+                # {self.target_prop}
                 @script  #(run_last=True)
                 def anchor_runner(source, target, scripts):
                     while True: {update_code}
@@ -209,8 +201,11 @@ class At:
                 '''
             )
             run_script = textwrap.dedent(script_str)
+            
             #print(self.target_prop, self.get_opposite())
-            print(run_script)
+            #if self.target_prop == 'left':
+            #    print(run_script)
+            
             exec(run_script)
             
         def get_update_code(self):
@@ -234,9 +229,12 @@ class At:
             
             source_value = source_value.replace('border_gap', str(At.gap))
             
+            get_safe = 'safe = source.objc_instance.safeAreaLayoutGuide().layoutFrame()' if At.safe else ''
+            
             return f'''
-                            value = {source_value} {self.modifiers}
-                            target_value = {target_value} {self.effective_gap}
+                            {get_safe} 
+                            value = ({source_value} {self.effective_gap}) {self.modifiers}
+                            target_value = {target_value}
                             if {target_attribute} != target_value:
                                 {target_attribute} = target_value
                             yield'''
@@ -265,8 +263,12 @@ class At:
             self.modifiers += f'* {other}'
             return self
             
-        def __div__(self, other):
+        def __truediv__(self, other):
             self.modifiers += f'/ {other}'
+            return self
+            
+        def __floordiv__(self, other):
+            self.modifiers += f'// {other}'
             return self
             
         def __mod__(self, other):
@@ -290,22 +292,21 @@ class At:
             view._scripter_at = at
             return at
 
-    def _prop(attribute, flex=False):
+    def _prop(attribute):
         p = property(
             lambda self:
                 partial(At._getter, self, attribute)(),
             lambda self, value:
-                partial(At._setter, self, attribute, flex, value)()
+                partial(At._setter, self, attribute, value)()
         )
         return p
 
     def _getter(self, attr_string):
         return At.Anchor(self, attr_string)
 
-    def _setter(self, attr_string, flex, value):
+    def _setter(self, attr_string, value):
         source_anchor = value
         source_anchor.set_target(self, attr_string)
-        source_anchor.flex = flex
         source_anchor.start_script()
             
     # ---------------- PROPERTIES
@@ -314,11 +315,6 @@ class At:
     right = _prop('right')
     top = _prop('top')
     bottom = _prop('bottom')
-    
-    left_flex = _prop('left', True)
-    right_flex = _prop('right', True)
-    top_flex = _prop('top', True)
-    bottom_flex = _prop('bottom', True)
     
     center = _prop('center')
     center_x = _prop('center_x')
@@ -341,7 +337,8 @@ class At:
     
 # Helper functions
     
-
+def at(view):
+    return At(view)
     
 def direction(target, source, value):
     """
@@ -389,10 +386,65 @@ def _parse_rules(rules):
 _rules = _parse_rules(_anchor_rules_spec)
 
     
+class Dock:
+    
+    direction_map = {
+        'T': 'top',
+        'L': 'left',
+        'B': 'bottom',
+        'R': 'right',
+    }
+    
+    def __init__(self, view):
+        if not view.superview:
+            raise ValueError('Cannot dock a view without a superview')
+        self.view = view
+        
+    def _dock(self, directions):
+        v = at(self.view)
+        sv = at(self.view.superview)
+        for direction in directions:
+            prop = self.direction_map[direction]
+            setattr(v, prop, getattr(sv, prop))
+            
+    all = partialmethod(_dock, 'TLBR')
+    bottom = partialmethod(_dock, 'LBR')
+    top = partialmethod(_dock, 'TLR')
+    right = partialmethod(_dock, 'TBR')
+    left = partialmethod(_dock, 'TLB')
+    top_left = partialmethod(_dock, 'TL')
+    top_right = partialmethod(_dock, 'TR')
+    bottom_left = partialmethod(_dock, 'BL')
+    bottom_right = partialmethod(_dock, 'BR')       
+        
+        
+def dock(view, superview=None) -> Dock:
+    if superview:
+        superview.add_subview(view)
+    return Dock(view)
+    
+    
 if __name__ == '__main__':
     
     import time
     import ui
+    
+    class SafeView(ui.View):
+        
+        def layout(self):            
+            safe = self.objc_instance.safeAreaInsets()
+            print(
+                safe.top,
+                safe.left,
+                safe.bottom,
+                safe.right
+            )
+            self.frame = self.superview.bounds.inset(
+                safe.top,
+                safe.left,
+                safe.bottom,
+                safe.right)
+            
     
     class Marker(ui.View):
         
@@ -430,17 +482,8 @@ if __name__ == '__main__':
     )
     set_scripter_view(v)
     
-    menu_view = ui.Label(
-        text='MENU',
-        text_color='white',
-        alignment=ui.ALIGN_CENTER,
-        border_color='white',
-        border_width=1,
-        background_color='grey',
-        frame=v.bounds,
-        width=300,
-        flex='H'
-    )
+    sv = ui.View(frame=v.bounds, flex='WH')
+    v.add_subview(sv)
     
     main_view = ui.Label(
         text='',
@@ -449,13 +492,25 @@ if __name__ == '__main__':
         border_color='white',
         border_width=1,
         #background_color='red',
-        frame=v.bounds,
+        frame=sv.bounds,
         flex='WH',
         touch_enabled=True,
     )
     
-    v.add_subview(menu_view)
-    v.add_subview(main_view)
+    menu_view = ui.Label(
+        text='MENU',
+        text_color='white',
+        alignment=ui.ALIGN_CENTER,
+        border_color='white',
+        border_width=1,
+        background_color='grey',
+        frame=sv.bounds,
+        width=300,
+        flex='H'
+    )
+    
+    sv.add_subview(menu_view)
+    sv.add_subview(main_view)
     
     def open_and_close(sender):
         
@@ -470,29 +525,17 @@ if __name__ == '__main__':
         image=ui.Image('iow:drag_32'),
         tint_color='white',
         action=open_and_close)
-        
-    main_view.add_subview(menu_button)
-    
-    At(menu_button).left = At(main_view).left
-    At(menu_button).top = At(main_view).top
+    dock(menu_button, main_view).top_left()
 
     At(menu_view).right = At(main_view).left
-    
-    m1 = Marker(main_view)
-    At(m1).top = At(main_view).top + 100
-    At(m1).center_x = At(main_view).center_x
+    mv = At(main_view)
     
     bottom_bar = ui.View(
         background_color='grey'
     )
     main_view.add_subview(bottom_bar)
+    dock(bottom_bar).bottom()
 
-    bb = At(bottom_bar)
-    mv = At(main_view)
-    bb.width = mv.width
-    bb.bottom = mv.bottom
-    bb.left = mv.left
-    
     pointer = ui.ImageView(image=ui.Image('iow:ios7_arrow_thin_down_32'))
     main_view.add_subview(pointer)
     At(pointer).heading_adjustment = - math.pi / 2
@@ -501,10 +544,21 @@ if __name__ == '__main__':
     mover = Mover(
         main_view,
         background_color='darkred')
-        
     mover.center = (100,100)
     At(pointer).heading = At(mover).center
     
-    v.present('fullscreen', 
-        animated=False
+    stretcher = ui.View(
+        background_color='grey',
+        height=30
     )
+    main_view.add_subview(stretcher)
+    at(stretcher).left = at(mover).center_x
+    at(stretcher).center_y = at(main_view).height * 3/4
+    at(stretcher).right = at(main_view).right
+    
+    
+    v.present('fullscreen', 
+        animated=False,
+        #hide_title_bar=True,
+    )
+
