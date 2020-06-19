@@ -6,6 +6,8 @@ import textwrap
 
 from functools import partialmethod
 
+import ui
+
 from scripter import *
 
 
@@ -177,12 +179,7 @@ class At:
                     else f'- {At.gap}')              
             
         def start_script(self):
-            previous_runner = self.target_at.running_scripts.pop(
-                self.target_prop, None)
-            if previous_runner:
-                cancel(previous_runner)
-            
-            #scripts = self.target_at.running_scripts
+            self.target_at._remove_anchor(self.target_prop)
             
             update_code = self.get_update_code()
             
@@ -305,25 +302,18 @@ class At:
         return At.Anchor(self, attr_string)
 
     def _setter(self, attr_string, value):
-        source_anchor = value
-        source_anchor.set_target(self, attr_string)
-        source_anchor.start_script()
-            
-    # ---------------- PROPERTIES
-            
-    left = _prop('left')
-    right = _prop('right')
-    top = _prop('top')
-    bottom = _prop('bottom')
-    
-    center = _prop('center')
-    center_x = _prop('center_x')
-    center_y = _prop('center_y')
-    width = _prop('width')
-    height = _prop('height')
-    heading = _prop('heading')
-    
-    
+        if value is None:
+            self._remove_anchor(attr_string)
+        else:
+            source_anchor = value
+            source_anchor.set_target(self, attr_string)
+            source_anchor.start_script()
+        
+    def _remove_anchor(self, attr_string):        
+        anchor = self.running_scripts.pop(attr_string, None)
+        if anchor:
+            cancel(anchor)
+        
     @property
     def _heading(self):
         return self.__heading
@@ -333,6 +323,19 @@ class At:
         self.__heading = value
         self.view.transform = ui.Transform.rotation(
             value + self.heading_adjustment)
+            
+    # PUBLIC PROPERTIES
+            
+    left = _prop('left')
+    right = _prop('right')
+    top = _prop('top')
+    bottom = _prop('bottom')
+    center = _prop('center')
+    center_x = _prop('center_x')
+    center_y = _prop('center_y')
+    width = _prop('width')
+    height = _prop('height')
+    heading = _prop('heading')
         
     
 # Helper functions
@@ -389,23 +392,36 @@ _rules = _parse_rules(_anchor_rules_spec)
 class Dock:
     
     direction_map = {
-        'T': 'top',
-        'L': 'left',
-        'B': 'bottom',
-        'R': 'right',
+        'T': ('top', +1),
+        'L': ('left', +1),
+        'B': ('bottom', -1),
+        'R': ('right', -1),
+        'X': ('center_x', 0),
+        'Y': ('center_y', 0),
+        'C': ('center', 0),
     }
     
-    def __init__(self, view):
+    def __init__(self, view, modifier=0):
         if not view.superview:
             raise ValueError('Cannot dock a view without a superview')
         self.view = view
+        self.modifier = modifier
         
     def _dock(self, directions):
         v = at(self.view)
         sv = at(self.view.superview)
         for direction in directions:
-            prop = self.direction_map[direction]
-            setattr(v, prop, getattr(sv, prop))
+            prop, sign = self.direction_map[direction]
+            if prop != 'center':
+                setattr(v, prop, getattr(sv, prop) + sign * self.modifier)
+            else:
+                setattr(v, prop, getattr(sv, prop))
+                
+    '''            
+    def __getattr__(self, attr):
+        print(attr)
+        return super().__getattribute__(attr)
+    '''
             
     all = partialmethod(_dock, 'TLBR')
     bottom = partialmethod(_dock, 'LBR')
@@ -415,64 +431,85 @@ class Dock:
     top_left = partialmethod(_dock, 'TL')
     top_right = partialmethod(_dock, 'TR')
     bottom_left = partialmethod(_dock, 'BL')
-    bottom_right = partialmethod(_dock, 'BR')       
+    bottom_right = partialmethod(_dock, 'BR')
+    sides = partialmethod(_dock, 'LR')
+    vertical = partialmethod(_dock, 'TB')
+    top_center = partialmethod(_dock, 'TX')
+    bottom_center = partialmethod(_dock, 'BX')
+    left_center = partialmethod(_dock, 'LY')
+    right_center = partialmethod(_dock, 'RY')
+    center = partialmethod(_dock, 'C')
         
         
-def dock(view, superview=None) -> Dock:
+def dock(view, superview=None, modifier=0) -> Dock:
     if superview:
         superview.add_subview(view)
-    return Dock(view)
+    return Dock(view, modifier)
     
+    
+class Align:
+    
+    def __init__(self, view):
+        self.anchor_view = at(view)
+        
+    def _align(self, prop, *others):
+        for other in others:
+            setattr(at(other), prop, getattr(self.anchor_view, prop))
+    
+    left = partialmethod(_align, 'left')
+    right = partialmethod(_align, 'right')
+    top = partialmethod(_align, 'top')
+    bottom = partialmethod(_align, 'bottom')
+    center = partialmethod(_align, 'center')
+    center_x = partialmethod(_align, 'center_x')
+    center_y = partialmethod(_align, 'center_y')
+    width = partialmethod(_align, 'width')
+    height = partialmethod(_align, 'height')
+    heading = partialmethod(_align, 'heading')
+    
+def align(view):
+    return Align(view)
+    
+def size_to_fit(view):
+    view.size_to_fit()
+    if type(view) in (ui.Button, ui.Label):
+        view.frame = view.frame.inset(-At.gap, -At.gap)
+        
     
 if __name__ == '__main__':
     
-    import time
     import ui
-    
-    class SafeView(ui.View):
-        
-        def layout(self):            
-            safe = self.objc_instance.safeAreaInsets()
-            print(
-                safe.top,
-                safe.left,
-                safe.bottom,
-                safe.right
-            )
-            self.frame = self.superview.bounds.inset(
-                safe.top,
-                safe.left,
-                safe.bottom,
-                safe.right)
-            
+
     
     class Marker(ui.View):
         
-        def __init__(self, superview, radius=15, background_color='grey'):
+        def __init__(self, superview, image=None, radius=15):
             super().__init__(
-                background_color=background_color
+                background_color='black',
+                border_color='white',
+                border_width=1,
             )
-            self._prev_size = self.width
             self.radius = radius
+            self.width = self.height = 2 * radius
+            self.corner_radius = self.width/2
             superview.add_subview(self)
             
-        def layout(self):
-            if self.width != self._prev_size:
-                dim = self.width
-            else:
-                dim = self.height
-            self.height = self.width = dim
-            self.corner_radius = self.width/2
-        
-        @property
-        def radius(self):
-            return self.width / 2
-            
-        @radius.setter
-        def radius(self, value):
-            self.width = value * 2
+            if image:
+                iv = ui.ImageView(
+                    image=ui.Image(image),
+                    content_mode=ui.CONTENT_SCALE_ASPECT_FIT,
+                    frame=self.bounds,
+                    flex='WH',
+                )
+                self.add_subview(iv)
+    
             
     class Mover(Marker):
+        
+        def __init__(self, superview, **kwargs):
+            super().__init__(superview,     
+                image='iow:arrow_expand_24',
+                **kwargs)
         
         def touch_moved(self, t):
             self.center += t.location - t.prev_location
@@ -482,8 +519,9 @@ if __name__ == '__main__':
     )
     set_scripter_view(v)
     
-    sv = ui.View(frame=v.bounds, flex='WH')
-    v.add_subview(sv)
+    sv = ui.View()
+    dock(sv, v, -At.gap).all()
+    print(at(sv).running_scripts)
     
     main_view = ui.Label(
         text='',
@@ -536,16 +574,19 @@ if __name__ == '__main__':
     main_view.add_subview(bottom_bar)
     dock(bottom_bar).bottom()
 
-    pointer = ui.ImageView(image=ui.Image('iow:ios7_arrow_thin_down_32'))
-    main_view.add_subview(pointer)
-    At(pointer).heading_adjustment = - math.pi / 2
-    At(pointer).center = mv.center
+    pointer = ui.ImageView(
+        image=ui.Image('iow:ios7_navigate_outline_256'),
+        width=36,
+        height=36,
+        content_mode=ui.CONTENT_SCALE_ASPECT_FIT,
+    )
     
-    mover = Mover(
-        main_view,
-        background_color='darkred')
+    dock(pointer, main_view).center()
+    at(pointer).heading_adjustment = math.pi / 4
+    
+    mover = Mover(main_view)
     mover.center = (100,100)
-    At(pointer).heading = At(mover).center
+    at(pointer).heading = at(mover).center
     
     stretcher = ui.View(
         background_color='grey',
@@ -557,8 +598,18 @@ if __name__ == '__main__':
     at(stretcher).right = at(main_view).right
     
     
+    l = ui.Label(text='Demo',
+        text_color='white',
+        border_color='white',
+        border_width=1,
+        alignment=ui.ALIGN_CENTER,
+    )
+    size_to_fit(l)
+    dock(l, main_view).top_center()
+    
+    
     v.present('fullscreen', 
         animated=False,
-        #hide_title_bar=True,
+        hide_title_bar=True,
     )
 
