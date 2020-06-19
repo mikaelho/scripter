@@ -4,7 +4,7 @@ import math
 import re
 import textwrap
 
-from functools import partialmethod
+from functools import partialmethod, partial
 
 import ui
 
@@ -417,11 +417,16 @@ class Dock:
             else:
                 setattr(v, prop, getattr(sv, prop))
                 
-    '''            
-    def __getattr__(self, attr):
-        print(attr)
-        return super().__getattribute__(attr)
-    '''
+    def __getattribute__(self, attr):
+        '''
+        Dock methods do not have to be called       
+        You can just say `Dock(view).center`
+        '''
+        attr_object = super().__getattribute__(attr)
+        if type(attr_object) == partial:
+            attr_object()
+            attr_object = lambda: None
+        return attr_object
             
     all = partialmethod(_dock, 'TLBR')
     bottom = partialmethod(_dock, 'LBR')
@@ -521,7 +526,6 @@ if __name__ == '__main__':
     
     sv = ui.View()
     dock(sv, v, -At.gap).all()
-    print(at(sv).running_scripts)
     
     main_view = ui.Label(
         text='',
@@ -581,7 +585,7 @@ if __name__ == '__main__':
         content_mode=ui.CONTENT_SCALE_ASPECT_FIT,
     )
     
-    dock(pointer, main_view).center()
+    dock(pointer, main_view).center
     at(pointer).heading_adjustment = math.pi / 4
     
     mover = Mover(main_view)
