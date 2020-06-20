@@ -129,6 +129,7 @@ class At:
     
     gap = 8  # Apple Standard gap
     safe = True  # Avoid iOS UI elements
+    TIGHT = -gap
     
     class Anchor:
         
@@ -444,6 +445,25 @@ class Dock:
     left_center = partialmethod(_dock, 'LY')
     right_center = partialmethod(_dock, 'RY')
     center = partialmethod(_dock, 'C')
+    
+    def between(self, a, b):
+        is_vertical = (
+            abs(a.center.y - b.center.y) >
+            abs(a.center.x - b.center.x)
+        )
+        a_a = at(a)
+        a_b = at(b)
+        a_self = at(self)
+        if is_vertical:
+            a_self.top = a_a.bottom + self.modifier
+            a_self.bottom = a_b.top - self.modifier
+            a_self.width = a_a.width
+            a_self.center_x = a_a.center_x
+        else:
+            a_self.left = a_a.right + self.modifier
+            a_self.right = a_b.left - self.modifier
+            a_self.height = a_a.height
+            a_self.center_y = a_a.center_y
         
         
 def dock(view, superview=None, modifier=0) -> Dock:
@@ -479,6 +499,7 @@ def size_to_fit(view):
     view.size_to_fit()
     if type(view) in (ui.Button, ui.Label):
         view.frame = view.frame.inset(-At.gap, -At.gap)
+    return view
         
     
 if __name__ == '__main__':
