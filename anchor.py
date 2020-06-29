@@ -1,4 +1,6 @@
 
+
+import inspect
 import json
 import math
 import re
@@ -76,7 +78,6 @@ center_x:
     source:
         regular: source.center.x
         container: source.bounds.center().x
-        safe: source.bounds.center().x
 center_y:
     type: neutral
     target:
@@ -85,7 +86,6 @@ center_y:
     source:
         regular: source.center.y
         container: source.bounds.center().y
-        safe: source.bounds.center().y
 center:
     type: neutral
     target:
@@ -94,7 +94,6 @@ center:
     source:
         regular: source.center
         container: source.bounds.center()
-        safe: source.bounds.center()
 width:
     type: neutral
     target:
@@ -121,7 +120,13 @@ heading:
     source:
         regular: source._scripter_at._heading
         container: source._scripter_at._heading
-        safe: source._scripter_at._heading
+attr:
+    type: neutral
+    target:
+        attribute: target._custom
+        value: value
+    source:
+        regular: source._custom
 """
 
 
@@ -143,24 +148,26 @@ class At:
             self.source_at = source_at
             self.source_prop = source_prop
             self.modifiers = ''
+            self.callable = None
             
         def set_target(self, target_at, target_prop):
             self.target_at = target_at
             self.target_prop = target_prop
+            self.safe = At.safe and 'safe' in _rules[self.source_prop]['source']
             
             if target_at.view.superview == self.source_at.view:
-                if At.safe:
+                if self.safe:
                     self.type = self.SAFE
                 else:
                     self.type = self.CONTAINER
             else:
                 self.type = self.REGULAR
             
-            source_type = _rules[self.source_prop]['type']
-            target_type = _rules[self.target_prop]['type']
+            source_type = _rules.get(self.source_prop, _rules['attr'])['type']
+            target_type = _rules.get(self.target_prop, _rules['attr'])['type']
             
             #print(source_type, target_type)
-            
+
             self.same = self.SAME if any([
                 source_type == self.NEUTRAL,
                 target_type == self.NEUTRAL,
@@ -182,60 +189,99 @@ class At:
         def start_script(self):
             self.target_at._remove_anchor(self.target_prop)
             
-            update_code = self.get_update_code()
+            if self.source_prop in _rules:
+                source_value = _rules[self.source_prop]['source'][self.type]
+                source_value = source_value.replace('border_gap', str(At.gap))
+            else:
+                source_value = _rules['attr']['source']['regular']
+                source_value = source_value.replace('_custom', self.source_prop)
             
-            script_str = (
-                f'''\
+            get_safe = (
+                'safe = source.objc_instance.safeAreaLayoutGuide().layoutFrame()'
+                if self.safe
+                else ''
+            )
+            
+            target_attribute = self.get_target_attribute(self.target_prop)
+            
+            flex_get = ''
+            flex_set = f'{target_attribute} = target_value'
+            opposite_prop = self.get_opposite(self.target_prop)
+            if opposite_prop:
+                flex_prop = self.target_prop + '_flex'
+                flex_get = f'''({self.get_target_value(flex_prop)}) if '{opposite_prop}' in scripts else '''
+                flex_set = f'''if '{opposite_prop}' in scripts: '''\
+                f'''{self.get_target_attribute(flex_prop)} = target_value'''\
+                f'''
+                            else: {target_attribute} = target_value
+                '''
+
+            call_callable = (
+                'target_value = func(target_value)' 
+                if self.target_at.callable is not None 
+                else '')
+            
+            script_str = (f'''\
                 # {self.target_prop}
                 @script  #(run_last=True)
-                def anchor_runner(source, target, scripts):
-                    while True: {update_code}
+                def anchor_runner(source, target, scripts, func):
+                    prev_value = None
+                    while True: 
+                        {get_safe} 
+                        value = ({source_value} {self.effective_gap}) {self.modifiers}
+                        target_value = (
+                            {flex_get}{self.get_target_value(self.target_prop)}
+                        ) 
+                        if target_value != prev_value:
+                            prev_value = target_value
+                            {call_callable}
+                            {flex_set}
+                        yield
                         
                 self.target_at.running_scripts[self.target_prop] = \
                     anchor_runner(
                         self.source_at.view, 
                         self.target_at.view,
-                        self.target_at.running_scripts)
+                        self.target_at.running_scripts,
+                        self.target_at.callable)
                 '''
             )
             run_script = textwrap.dedent(script_str)
             
-            #print(self.target_prop, self.get_opposite())
-            #if self.target_prop == 'left':
-            #    print(run_script)
+            #print(run_script)
             
             exec(run_script)
             
-        def get_update_code(self):
-            source_prop = self.source_prop
+        def get_choice_code(self, code):
             target_prop = self.target_prop
             opposite_prop = self.get_opposite(target_prop)
             
             if opposite_prop:
                 flex_prop = f'{target_prop}_flex'
                 return f'''
-                        if '{opposite_prop}' in scripts:
-                            {self.get_code(source_prop, flex_prop)}
-                        else:{self.get_code(source_prop, target_prop)}'''
+                            if '{opposite_prop}' in scripts: {self.get_code(flex_prop)}
+                            else: {self.get_code(target_prop)}'''
             else:
-                return self.get_code(source_prop, target_prop)
+                return f'; {self.get_code(target_prop)}'
             
-        def get_code(self, source_prop, target_prop):
-            source_value = _rules[source_prop]['source'][self.type]
-            target_value = _rules[target_prop]['target']['value']
-            target_attribute = _rules[target_prop]['target']['attribute']
+        def get_target_value(self, target_prop):
+            if target_prop in _rules:
+                target_value = _rules[target_prop]['target']['value']
+            else:
+                target_value = _rules['attr']['target']['value']
+                target_value = target_value.replace('_custom', target_prop)
+            return target_value
             
-            source_value = source_value.replace('border_gap', str(At.gap))
+            #return f'''{target_attribute} = {target_value}'''
             
-            get_safe = 'safe = source.objc_instance.safeAreaLayoutGuide().layoutFrame()' if At.safe else ''
-            
-            return f'''
-                            {get_safe} 
-                            value = ({source_value} {self.effective_gap}) {self.modifiers}
-                            target_value = {target_value}
-                            if {target_attribute} != target_value:
-                                {target_attribute} = target_value
-                            yield'''
+        def get_target_attribute(self, target_prop):
+            if target_prop in _rules:
+                target_attribute = _rules[target_prop]['target']['attribute']
+            else:
+                target_attribute = _rules['attr']['target']['attribute']
+                target_attribute = target_attribute.replace(
+                    '_custom', target_prop)
+            return target_attribute
             
         def get_opposite(self, prop):
             opposites = (
@@ -250,7 +296,10 @@ class At:
             return None
             
         def __add__(self, other):
-            self.modifiers += f'+ {other}'
+            if callable(other):
+                self.callable = other
+            else:
+                self.modifiers += f'+ {other}'
             return self
             
         def __sub__(self, other):
@@ -287,6 +336,7 @@ class At:
             at.__heading = 0
             at.heading_adjustment = 0
             at.running_scripts = {}
+            at.callable = None
             view._scripter_at = at
             return at
 
@@ -337,12 +387,28 @@ class At:
     width = _prop('width')
     height = _prop('height')
     heading = _prop('heading')
-        
+                
     
+# Direct access functions
+    
+def at(view, func=None):
+    a = At(view)
+    a.callable = func
+    return a
+    
+def attr(data, func=None):
+    at = At(data)
+    at.callable = func
+    for attr_name in dir(data):
+        if (not attr_name.startswith('_') and 
+        not hasattr(At, attr_name) and
+        inspect.isdatadescriptor(
+            inspect.getattr_static(data, attr_name)
+        )):
+            setattr(At, attr_name, At._prop(attr_name))
+    return at 
+
 # Helper functions
-    
-def at(view):
-    return At(view)
     
 def direction(target, source, value):
     """
@@ -611,7 +677,6 @@ if __name__ == '__main__':
     
     mover = Mover(main_view)
     mover.center = (100,100)
-    at(pointer).heading = at(mover).center
     
     stretcher = ui.View(
         background_color='grey',
@@ -623,18 +688,23 @@ if __name__ == '__main__':
     at(stretcher).right = at(main_view).right
     
     
-    l = ui.Label(text='Demo',
+    l = ui.Label(text='-999',
+        font=('Anonymous Pro', 12),
         text_color='white',
-        border_color='white',
-        border_width=1,
-        alignment=ui.ALIGN_CENTER,
+        alignment=ui.ALIGN_RIGHT,
     )
-    size_to_fit(l)
-    dock(l, main_view).top_center()
-    
+    l.size_to_fit()
+    main_view.add_subview(l)
+    at(l).center_x = at(pointer).center_x
+    at(l).top = at(pointer).center_y + 25
+
+    attr(l, lambda angle: f'{int(math.degrees(angle))}'
+    ).text = at(pointer).heading
     
     v.present('fullscreen', 
         animated=False,
         hide_title_bar=True,
     )
+
+    at(pointer).heading = at(mover).center
 
