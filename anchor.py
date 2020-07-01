@@ -73,16 +73,16 @@ bottom_flex:
 center_x:
     type: neutral
     target:
-        attribute: target.x
-        value: value - target.width / 2
+        attribute: target.center
+        value: (value, target.center.y)
     source:
         regular: source.center.x
         container: source.bounds.center().x
 center_y:
     type: neutral
     target:
-        attribute: target.y
-        value: value - target.height / 2
+        attribute: target.center
+        value: (target.center.x, value)
     source:
         regular: source.center.y
         container: source.bounds.center().y
@@ -135,6 +135,10 @@ class At:
     gap = 8  # Apple Standard gap
     safe = True  # Avoid iOS UI elements
     TIGHT = -gap
+    
+    @classmethod
+    def gaps_for(cls, count):
+        return (count - 1) / count * At.gap
     
     class Anchor:
         
@@ -247,8 +251,6 @@ class At:
                 '''
             )
             run_script = textwrap.dedent(script_str)
-            
-            #print(run_script)
             
             exec(run_script)
             
@@ -512,14 +514,16 @@ class Dock:
     right_center = partialmethod(_dock, 'RY')
     center = partialmethod(_dock, 'C')
     
+    '''
+    @script
     def between(self, a, b):
-        is_vertical = (
-            abs(a.center.y - b.center.y) >
-            abs(a.center.x - b.center.x)
-        )
+        yield
+        delta_y = abs(a.center.y - b.center.y)
+        delta_x = abs(a.center.x - b.center.x)
+        is_vertical = delta_y > delta_x
         a_a = at(a)
         a_b = at(b)
-        a_self = at(self)
+        a_self = at(self.view)
         if is_vertical:
             a_self.top = a_a.bottom + self.modifier
             a_self.bottom = a_b.top - self.modifier
@@ -530,6 +534,44 @@ class Dock:
             a_self.right = a_b.left - self.modifier
             a_self.height = a_a.height
             a_self.center_y = a_a.center_y
+    '''
+    def between(self, top=None, bottom=None, left=None, right=None):
+        a_self = at(self.view)
+        if top:
+            a_self.top = at(top).bottom
+        if bottom:
+            a_self.bottom = at(bottom).top
+        if left:
+            a_self.left = at(left).right
+        if right:
+            a_self.right = at(right).left
+        if top or bottom:
+            a = at(top or bottom)
+            a_self.width = a.width
+            a_self.center_x = a.center_x
+        if left or right:
+            a = at(left or right)
+            a_self.height = a.height
+            a_self.center_y = a.center_y
+
+    def above(self, other):
+        at(self.view).bottom = at(other).top
+        align(self.view).center_x(other)
+        
+    def below(self, other):
+        at(self.view).top = at(other).bottom
+        at(other).center_x = at(self.view).center_x
+        at(other).width = at(self.view).width
+        #align(self.view).center_x(other)
+        align(self.view).width(other)
+        
+    def to_the_left(self, other):
+        at(self.view).right = at(other).left
+        align(self.view).center_y(other)
+        
+    def to_the_right(self, other):
+        at(self.view).left = at(other).right
+        align(self.view).center_y(other)
         
         
 def dock(view, superview=None, modifier=0) -> Dock:
@@ -541,11 +583,11 @@ def dock(view, superview=None, modifier=0) -> Dock:
 class Align:
     
     def __init__(self, view):
-        self.anchor_view = at(view)
+        self.anchor_at = at(view)
         
     def _align(self, prop, *others):
         for other in others:
-            setattr(at(other), prop, getattr(self.anchor_view, prop))
+            setattr(at(other), prop, getattr(self.anchor_at, prop))
     
     left = partialmethod(_align, 'left')
     right = partialmethod(_align, 'right')
@@ -560,6 +602,46 @@ class Align:
     
 def align(view):
     return Align(view)
+    
+def fill_from_top(superview, *views):
+    assert len(views) > 0, 'Give at least one view'
+    first = views[0]
+    dock(first, superview).top
+    for i, view in enumerate(views[1:]):
+        dock(view, superview).sides
+        at(view).top = at(views[i]).bottom
+    for view in views:
+        at(view).height = at(superview).height / len(views) - At.gaps_for(len(views))
+        
+def fill_from_top(superview, *views):
+    assert len(views) > 0, 'Give at least one view'
+    first = views[0]
+    dock(first, superview).bottom
+    for i, view in enumerate(views[1:]):
+        dock(view, superview).sides
+        at(view).bottom = at(views[i]).top
+    for view in views:
+        at(view).height = at(superview).height / len(views) - At.gaps_for(len(views))
+        
+def fill_from_left(superview, *views):
+    assert len(views) > 0, 'Give at least one view'
+    first = views[0]
+    dock(first, superview).left
+    for i, view in enumerate(views[1:]):
+        dock(view, superview).vertical
+        at(view).left = at(views[i]).right
+    for view in views:
+        at(view).width = at(superview).width / len(views) - At.gaps_for(len(views))
+        
+def fill_from_right(superview, *views):
+    assert len(views) > 0, 'Give at least one view'
+    first = views[0]
+    dock(first, superview).right
+    for i, view in enumerate(views[1:]):
+        dock(view, superview).vertical
+        at(view).right = at(views[i]).left
+    for view in views:
+        at(view).width = at(superview).width / len(views) - At.gaps_for(len(views))
     
 def size_to_fit(view):
     view.size_to_fit()
@@ -660,7 +742,9 @@ if __name__ == '__main__':
     mv = At(main_view)
     
     bottom_bar = ui.View(
-        background_color='grey'
+        background_color='grey',
+        border_color='red',
+        border_width=5,
     )
     main_view.add_subview(bottom_bar)
     dock(bottom_bar).bottom()
@@ -684,21 +768,21 @@ if __name__ == '__main__':
     )
     main_view.add_subview(stretcher)
     at(stretcher).left = at(mover).center_x
-    at(stretcher).center_y = at(main_view).height * 3/4
+    at(stretcher).center_y = at(main_view).height * 4/6
     at(stretcher).right = at(main_view).right
     
     
-    l = ui.Label(text='-999',
+    l = ui.Label(text='000',
         font=('Anonymous Pro', 12),
         text_color='white',
-        alignment=ui.ALIGN_RIGHT,
+        alignment=ui.ALIGN_CENTER,
     )
     l.size_to_fit()
     main_view.add_subview(l)
     at(l).center_x = at(pointer).center_x
     at(l).top = at(pointer).center_y + 25
 
-    attr(l, lambda angle: f'{int(math.degrees(angle))}'
+    attr(l, lambda angle: f"{int(math.degrees(angle))%360:03}"
     ).text = at(pointer).heading
     
     v.present('fullscreen', 
