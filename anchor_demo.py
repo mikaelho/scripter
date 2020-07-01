@@ -35,24 +35,17 @@ dock(title_area, root, At.TIGHT).top
 
 content_area = style(ui.View())
 dock(content_area, root, At.TIGHT).bottom()
-
 at(content_area).top = at(title_area).bottom
 
 dock_area = style(ui.View())
-#dock(dock_area, content_area).top
-#at(dock_area).height = at(content_area).height / 3 - At.gaps_for(3)
 flex_area = style(ui.View())
 pointer_area = style(ui.View())
-#dock(pointer_area, content_area).bottom
-#at(pointer_area).height = at(content_area).height / 3 - At.gaps_for(3)
 
-fill_from_top(content_area,
+fill(content_area).from_top(
     dock_area,
     flex_area,
     pointer_area
 )
-
-#dock(flex_area, content_area).between(top=dock_area, bottom=pointer_area)
 
 safe_area_note = size_to_fit(style_label(ui.Label(
     text='respect safe area by default')))

@@ -220,9 +220,10 @@ class At:
                             else: {target_attribute} = target_value
                 '''
 
+            func = self.callable or self.target_at.callable
             call_callable = (
                 'target_value = func(target_value)' 
-                if self.target_at.callable is not None 
+                if func is not None 
                 else '')
             
             script_str = (f'''\
@@ -247,7 +248,7 @@ class At:
                         self.source_at.view, 
                         self.target_at.view,
                         self.target_at.running_scripts,
-                        self.target_at.callable)
+                        self.callable or self.target_at.callable)
                 '''
             )
             run_script = textwrap.dedent(script_str)
@@ -603,45 +604,35 @@ class Align:
 def align(view):
     return Align(view)
     
-def fill_from_top(superview, *views):
-    assert len(views) > 0, 'Give at least one view'
-    first = views[0]
-    dock(first, superview).top
-    for i, view in enumerate(views[1:]):
-        dock(view, superview).sides
-        at(view).top = at(views[i]).bottom
-    for view in views:
-        at(view).height = at(superview).height / len(views) - At.gaps_for(len(views))
+    
+class Fill:
+    
+    def __init__(self, superview):
+        self.superview = superview
+        self.super_at = at(superview)
         
-def fill_from_top(superview, *views):
-    assert len(views) > 0, 'Give at least one view'
-    first = views[0]
-    dock(first, superview).bottom
-    for i, view in enumerate(views[1:]):
-        dock(view, superview).sides
-        at(view).bottom = at(views[i]).top
-    for view in views:
-        at(view).height = at(superview).height / len(views) - At.gaps_for(len(views))
-        
-def fill_from_left(superview, *views):
-    assert len(views) > 0, 'Give at least one view'
-    first = views[0]
-    dock(first, superview).left
-    for i, view in enumerate(views[1:]):
-        dock(view, superview).vertical
-        at(view).left = at(views[i]).right
-    for view in views:
-        at(view).width = at(superview).width / len(views) - At.gaps_for(len(views))
-        
-def fill_from_right(superview, *views):
-    assert len(views) > 0, 'Give at least one view'
-    first = views[0]
-    dock(first, superview).right
-    for i, view in enumerate(views[1:]):
-        dock(view, superview).vertical
-        at(view).right = at(views[i]).left
-    for view in views:
-        at(view).width = at(superview).width / len(views) - At.gaps_for(len(views))
+    def _fill(self, attr, opposite, sides, size, *views):
+        assert len(views) > 0, 'Give at least one view'
+        first = views[0]
+        getattr(dock(first, self.superview), attr)
+        for i, view in enumerate(views[1:]):
+            getattr(dock(view, self.superview), sides)
+            setattr(at(view), attr, getattr(at(views[i]), opposite))
+        for view in views:
+            setattr(at(view), size, 
+                getattr(at(self.superview), size) /
+                len(views) - At.gaps_for(len(views))
+            )
+            
+    from_top = partialmethod(_fill, 'top', 'bottom', 'sides', 'height')
+    from_bottom = partialmethod(_fill, 'bottom', 'top', 'sides', 'height')
+    from_left = partialmethod(_fill, 'left', 'right', 'vertical', 'width')
+    from_right = partialmethod(_fill, 'right', 'left', 'vertical', 'width')
+    
+    
+def fill(superview):
+    return Fill(superview)
+
     
 def size_to_fit(view):
     view.size_to_fit()
@@ -782,8 +773,9 @@ if __name__ == '__main__':
     at(l).center_x = at(pointer).center_x
     at(l).top = at(pointer).center_y + 25
 
-    attr(l, lambda angle: f"{int(math.degrees(angle))%360:03}"
-    ).text = at(pointer).heading
+    attr(l).text = at(pointer).heading + (
+        lambda angle: f"{int(math.degrees(angle))%360:03}"
+    )
     
     v.present('fullscreen', 
         animated=False,
