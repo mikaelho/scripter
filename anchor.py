@@ -7,6 +7,7 @@ import re
 import textwrap
 
 from functools import partialmethod, partial
+from itertools import accumulate
 
 import ui
 
@@ -112,6 +113,38 @@ height:
         regular: source.height
         container: source.bounds.height - 2 * border_gap
         safe: safe.size.height - 2 * border_gap
+position:
+    type: neutral
+    target:
+        attribute: target.frame
+        value: (value[0], value[1], target.width, target.height)
+    source:
+        regular: (source.x, source.y)
+        container: (source.x, source.y)
+size:
+    type: neutral
+    target:
+        attribute: target.frame
+        value: (target.x, target.y, value[0], value[1])
+    source:
+        regular: (source.width, source.height)
+        container: (source.width, source.height)
+frame:
+    type: neutral
+    target:
+        attribute: target.frame
+        value: value
+    source:
+        regular: source.frame
+        container: source.frame
+bounds:
+    type: neutral
+    target:
+        attribute: target.bounds
+        value: value
+    source:
+        regular: source.bounds
+        container: source.bounds
 heading:
     type: neutral
     target:
@@ -127,6 +160,15 @@ attr:
         value: value
     source:
         regular: source._custom
+fit_size:
+    source:
+        regular: subview_bounds(source)
+fit_width:
+    source:
+        regular: subview_bounds(source).width
+fit_height:
+    source:
+        regular: subview_bounds(source).height
 """
 
 
@@ -167,8 +209,8 @@ class At:
             else:
                 self.type = self.REGULAR
             
-            source_type = _rules.get(self.source_prop, _rules['attr'])['type']
-            target_type = _rules.get(self.target_prop, _rules['attr'])['type']
+            source_type = _rules.get(self.source_prop, _rules['attr']).get('type', 'neutral')
+            target_type = _rules.get(self.target_prop, _rules['attr']).get('type', 'neutral')
             
             #print(source_type, target_type)
 
@@ -221,24 +263,32 @@ class At:
                 '''
 
             func = self.callable or self.target_at.callable
-            call_callable = (
-                'target_value = func(target_value)' 
-                if func is not None 
-                else '')
-            
+            call_callable = ''
+            if func:
+                call_str = 'func(target_value)'
+                parameters = inspect.signature(func).parameters
+                if len(parameters) == 2:
+                    call_str = 'func(target_value, target)'
+                if len(parameters) == 3:
+                    call_str = 'func(target_value, target, source)'
+                call_callable = f'target_value = {call_str}'
+
             script_str = (f'''\
                 # {self.target_prop}
                 @script  #(run_last=True)
                 def anchor_runner(source, target, scripts, func):
                     prev_value = None
+                    prev_bounds = None
                     while True: 
                         {get_safe} 
                         value = ({source_value} {self.effective_gap}) {self.modifiers}
                         target_value = (
                             {flex_get}{self.get_target_value(self.target_prop)}
                         ) 
-                        if target_value != prev_value:
+                        if (target_value != prev_value or 
+                        target.superview.bounds != prev_bounds):
                             prev_value = target_value
+                            prev_bounds = target.superview.bounds
                             {call_callable}
                             {flex_set}
                         yield
@@ -252,7 +302,7 @@ class At:
                 '''
             )
             run_script = textwrap.dedent(script_str)
-            
+            #print(run_script)
             exec(run_script)
             
         def get_choice_code(self, code):
@@ -389,7 +439,14 @@ class At:
     center_y = _prop('center_y')
     width = _prop('width')
     height = _prop('height')
+    position = _prop('position')
+    size = _prop('size')
+    frame = _prop('frame')
+    bounds = _prop('bounds')
     heading = _prop('heading')
+    fit_size = _prop('fit_size')
+    fit_width = _prop('fit_width')
+    fit_height = _prop('fit_height')
                 
     
 # Direct access functions
@@ -427,6 +484,15 @@ def direction(target, source, value):
         pass
     return value
     
+def subview_bounds(view):
+    subviews_accumulated = list(accumulate(
+        [v.frame for v in view.subviews], 
+        ui.Rect.union))
+    if len(subviews_accumulated):
+        bounds = subviews_accumulated[-1]
+    else:
+        bounds = ui.Rect(0, 0, 0, 0)
+    return bounds.inset(-At.gap, -At.gap)
 
 def _parse_rules(rules):    
     rule_dict = dict()
@@ -612,7 +678,7 @@ class Fill:
         self.super_at = at(superview)
         
     def _fill(self, attr, opposite, sides, size, *views):
-        assert len(views) > 0, 'Give at least one view'
+        assert len(views) > 0, 'Give at least one view to fill with'
         first = views[0]
         getattr(dock(first, self.superview), attr)
         for i, view in enumerate(views[1:]):
@@ -620,7 +686,7 @@ class Fill:
             setattr(at(view), attr, getattr(at(views[i]), opposite))
         for view in views:
             setattr(at(view), size, 
-                getattr(at(self.superview), size) /
+                getattr(self.super_at, size) /
                 len(views) - At.gaps_for(len(views))
             )
             
@@ -633,11 +699,76 @@ class Fill:
 def fill(superview):
     return Fill(superview)
 
+
+class Flow:
+
+    def __init__(self, superview):
+        self.superview = superview
+        self.super_at = at(superview)
+    
+    @script    
+    def _flow(self, corner, attr, opposite, size, other_size, edge, *views):
+        yield
+        assert len(views) > 0, 'Give at least one view for the flow'
+        first = views[0]
+        getattr(dock(first, self.superview), corner)
+        for i, view in enumerate(views[1:]):
+            self.superview.add_subview(view)
+            setattr(at(view), size, 
+                getattr(at(views[i]), size))
+            at(view).frame =  at(views[i]).frame + (
+                lambda value, target:
+                    (At.gap, value.max_y + At.gap, target.width, target.height)
+                    if value.max_x + target.width + 2 * At.gap > self.superview.width
+                    else (value.max_x + At.gap, value.y, target.width, target.height)
+            )
+            
+    def _flow_2(self, corner, attr, opposite, size, other_size, edge, *views):
+        assert len(views) > 0, 'Give at least one view to flow with'
+        first = views[0]
+        getattr(dock(first, self.superview), corner)
+        
+        def too_much(value, target):
+            return (
+                (value + getattr(target, other_size))
+                >
+                (getattr(self.superview, other_size) - At.gap)
+            )
+        for i, view in enumerate(views[1:]):
+            self.superview.add_subview(view)
+            setattr(at(view), size, 
+                getattr(at(views[i]), size))
+            setattr(at(view), attr, 
+                getattr(at(views[i]), opposite) +
+                (lambda value, target:
+                    At.gap if too_much(value, target) else value
+                )
+            )
+            setattr(at(view), edge, 
+                getattr(at(views[i]), edge) +
+                (lambda value, target:
+                    (value + getattr(target, size) + At.gap)
+                    if getattr(target, 'x') == At.gap
+                    else value
+                )
+            )
+        
+    from_top_left = partialmethod(_flow, 
+        'top_left',
+        'left', 'right',
+        'height', 'width',
+        'top')
+
+def flow(superview):
+    return Flow(superview)
+    
     
 def size_to_fit(view):
     view.size_to_fit()
-    if type(view) in (ui.Button, ui.Label):
+    if type(view) is ui.Label:
         view.frame = view.frame.inset(-At.gap, -At.gap)
+    if type(view) is ui.Button:
+        view.frame = view.frame.inset(0, -At.gap)
     return view
         
     
