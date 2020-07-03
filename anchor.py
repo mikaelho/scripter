@@ -707,7 +707,7 @@ class Flow:
         self.super_at = at(superview)
     
     @script    
-    def _flow(self, corner, attr, opposite, size, other_size, edge, *views):
+    def _flow(self, corner, size, func, *views):
         yield
         assert len(views) > 0, 'Give at least one view for the flow'
         first = views[0]
@@ -716,48 +716,57 @@ class Flow:
             self.superview.add_subview(view)
             setattr(at(view), size, 
                 getattr(at(views[i]), size))
-            at(view).frame =  at(views[i]).frame + (
-                lambda value, target:
-                    (At.gap, value.max_y + At.gap, target.width, target.height)
-                    if value.max_x + target.width + 2 * At.gap > self.superview.width
-                    else (value.max_x + At.gap, value.y, target.width, target.height)
-            )
+            at(view).frame =  at(views[i]).frame + func
             
-    def _flow_2(self, corner, attr, opposite, size, other_size, edge, *views):
-        assert len(views) > 0, 'Give at least one view to flow with'
-        first = views[0]
-        getattr(dock(first, self.superview), corner)
-        
-        def too_much(value, target):
-            return (
-                (value + getattr(target, other_size))
-                >
-                (getattr(self.superview, other_size) - At.gap)
-            )
-        for i, view in enumerate(views[1:]):
-            self.superview.add_subview(view)
-            setattr(at(view), size, 
-                getattr(at(views[i]), size))
-            setattr(at(view), attr, 
-                getattr(at(views[i]), opposite) +
-                (lambda value, target:
-                    At.gap if too_much(value, target) else value
-                )
-            )
-            setattr(at(view), edge, 
-                getattr(at(views[i]), edge) +
-                (lambda value, target:
-                    (value + getattr(target, size) + At.gap)
-                    if getattr(target, 'x') == At.gap
-                    else value
-                )
-            )
-        
+    def _from_left(down, value, target):
+        if value.max_x + target.width + 2 * At.gap > target.superview.width:
+            return (At.gap, value.y + down * (target.height + At.gap), 
+            target.width, target.height)
+        return (value.max_x + At.gap, value.y, target.width, target.height)
+            
     from_top_left = partialmethod(_flow, 
-        'top_left',
-        'left', 'right',
-        'height', 'width',
-        'top')
+        'top_left', 'height',
+        partial(_from_left, 1))
+    from_bottom_left = partialmethod(_flow, 
+        'bottom_left', 'height',
+        partial(_from_left, -1))
+        
+    def _from_right(down, value, target):
+        if value.x - target.width - At.gap < At.gap:
+            return (target.superview.width - target.width - At.gap, 
+            value.y + down * (target.height + At.gap), 
+            target.width, target.height)
+        return (value.x - At.gap - target.width, value.y,
+        target.width, target.height)
+            
+    from_top_right = partialmethod(_flow, 
+        'top_right', 'height', partial(_from_right, 1))
+    from_bottom_right = partialmethod(_flow, 
+        'bottom_right', 'height', partial(_from_right, -1))
+        
+    def _from_top(right, value, target):
+        if value.max_y + target.height + 2 * At.gap > target.superview.height:
+            return (value.x + right * (target.width + At.gap), At.gap, 
+            target.width, target.height)
+        return (value.x, value.max_y + At.gap, target.width, target.height)
+        
+    from_left_down = partialmethod(_flow, 
+        'top_left', 'width', partial(_from_top, 1))
+    from_right_down = partialmethod(_flow, 
+        'top_right', 'width', partial(_from_top, -1))
+        
+    def _from_bottom(right, value, target):
+        if value.y - target.height - At.gap < At.gap:
+            return (value.x + right * (target.width + At.gap), 
+            target.superview.height - target.height - At.gap, 
+            target.width, target.height)
+        return (value.x, value.y - target.height - At.gap,
+        target.width, target.height)
+        
+    from_left_up = partialmethod(_flow, 
+        'bottom_left', 'width', partial(_from_bottom, 1))
+    from_right_up = partialmethod(_flow, 
+        'bottom_right', 'width', partial(_from_bottom, -1))
 
 def flow(superview):
     return Flow(superview)

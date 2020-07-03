@@ -7,20 +7,12 @@ from scripter import set_scripter_view
 from anchor import *
 
 
-colors = ('#9ccc64', '#cfff94', 'white')
-
 def style(*views):
     for v in views:
         view = v
-        color_index = 0
-        while True:
-            view = view.superview
-            if view == root: break
-            color_index += 1
-        color_index = min(color_index, len(colors) - 1)
-        v.background_color = colors[color_index]
-        v.text_color = v.tint_color = v.border_color = 'black'
-        #v.border_width = 1
+        v.background_color = 'black'
+        v.text_color = v.tint_color = v.border_color = 'white'
+        v.border_width = 1
         v.alignment = ui.ALIGN_CENTER
     
     return v
@@ -33,7 +25,7 @@ def style_label(v):
     return v
 
 root = ui.View(
-    background_color='white',
+    background_color='black',
 )
 set_scripter_view(root)
 
@@ -43,7 +35,7 @@ dock(title_area, root, At.TIGHT).top
 
 content_area = ui.View()
 dock(content_area, root, At.TIGHT).bottom()
-at(content_area).top = at(title_area).bottom
+at(content_area).top = at(title_area).bottom + At.TIGHT
 
 button_area = ui.View()
 flex_area = ui.View()
