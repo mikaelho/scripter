@@ -537,22 +537,20 @@ class Dock:
         'C': ('center', 0),
     }
     
-    def __init__(self, view, modifier=0):
-        if not view.superview:
-            raise ValueError('Cannot dock a view without a superview')
-        self.view = view
-        self.modifier = modifier
+    def __init__(self, superview):
+        self.superview = superview
         
-    def _dock(self, directions):
-        v = at(self.view)
-        sv = at(self.view.superview)
+    def _dock(self, directions, view, modifier=0):
+        self.superview.add_subview(view)
+        v = at(view)
+        sv = at(self.superview)
         for direction in directions:
             prop, sign = self.direction_map[direction]
             if prop != 'center':
-                setattr(v, prop, getattr(sv, prop) + sign * self.modifier)
+                setattr(v, prop, getattr(sv, prop) + sign * modifier)
             else:
                 setattr(v, prop, getattr(sv, prop))
-                
+    """
     def __getattribute__(self, attr):
         '''
         Dock methods do not have to be called       
@@ -563,6 +561,7 @@ class Dock:
             attr_object()
             attr_object = lambda: None
         return attr_object
+    """
             
     all = partialmethod(_dock, 'TLBR')
     bottom = partialmethod(_dock, 'LBR')
@@ -641,10 +640,8 @@ class Dock:
         align(self.view).center_y(other)
         
         
-def dock(view, superview=None, modifier=0) -> Dock:
-    if superview:
-        superview.add_subview(view)
-    return Dock(view, modifier)
+def dock(superview) -> Dock:
+    return Dock(superview)
     
     
 class Align:
@@ -673,31 +670,59 @@ def align(view):
     
 class Fill:
     
-    def __init__(self, superview):
+    def __init__(self, superview, count=1):
         self.superview = superview
         self.super_at = at(superview)
+        self.count = count
         
-    def _fill(self, attr, opposite, sides, size, *views):
+    def _fill(self, corner, attr, opposite, center, side, other_side, size, other_size,
+    *views):
         assert len(views) > 0, 'Give at least one view to fill with'
         first = views[0]
-        getattr(dock(first, self.superview), attr)
+        getattr(dock(self.superview), corner)(first)
+        gaps = At.gaps_for(self.count)
+        per_count = math.ceil(len(views)/self.count)
+        per_gaps = At.gaps_for(per_count)
         for i, view in enumerate(views[1:]):
-            getattr(dock(view, self.superview), sides)
-            setattr(at(view), attr, getattr(at(views[i]), opposite))
+            self.superview.add_subview(view)
+            if (i + 1) % per_count != 0:
+                setattr(at(view), attr, getattr(at(views[i]), opposite))
+                setattr(at(view), center, getattr(at(views[i]), center))
+            else:
+                setattr(at(view), attr, getattr(self.super_at, attr))
+                setattr(at(view), side, getattr(at(views[i]), other_side))
         for view in views:
             setattr(at(view), size, 
-                getattr(self.super_at, size) /
-                len(views) - At.gaps_for(len(views))
+                getattr(self.super_at, size) + (
+                    lambda v: v / per_count - per_gaps
+                )
+            )
+            setattr(at(view), other_size, 
+                getattr(self.super_at, other_size) + (
+                    lambda v: v / self.count - gaps
+                )
             )
             
-    from_top = partialmethod(_fill, 'top', 'bottom', 'sides', 'height')
-    from_bottom = partialmethod(_fill, 'bottom', 'top', 'sides', 'height')
-    from_left = partialmethod(_fill, 'left', 'right', 'vertical', 'width')
-    from_right = partialmethod(_fill, 'right', 'left', 'vertical', 'width')
+    from_top = partialmethod(_fill, 'top_left',
+    'top', 'bottom', 'center_x',
+    'left', 'right',
+    'height', 'width')
+    from_bottom = partialmethod(_fill, 'bottom_left',
+    'bottom', 'top', 'center_x',
+    'left', 'right',
+    'height', 'width')
+    from_left = partialmethod(_fill, 'top_left',
+    'left', 'right', 'center_y',
+    'top', 'bottom',
+    'width', 'height')
+    from_right = partialmethod(_fill, 'top_right',
+    'right', 'left', 'center_y',
+    'top', 'bottom',
+    'width', 'height')
     
     
-def fill(superview):
-    return Fill(superview)
+def fill(superview, count=1):
+    return Fill(superview, count)
 
 
 class Flow:
@@ -711,7 +736,7 @@ class Flow:
         yield
         assert len(views) > 0, 'Give at least one view for the flow'
         first = views[0]
-        getattr(dock(first, self.superview), corner)
+        getattr(dock(self.superview), corner)(first)
         for i, view in enumerate(views[1:]):
             self.superview.add_subview(view)
             setattr(at(view), size, 
@@ -771,7 +796,6 @@ class Flow:
 def flow(superview):
     return Flow(superview)
     
-    
 def size_to_fit(view):
     view.size_to_fit()
     if type(view) is ui.Label:
@@ -783,9 +807,7 @@ def size_to_fit(view):
     
 if __name__ == '__main__':
     
-    import ui
 
-    
     class Marker(ui.View):
         
         def __init__(self, superview, image=None, radius=15):
@@ -825,7 +847,7 @@ if __name__ == '__main__':
     set_scripter_view(v)
     
     sv = ui.View()
-    dock(sv, v, -At.gap).all()
+    dock(v).all(sv, At.TIGHT)
     
     main_view = ui.Label(
         text='',
@@ -833,7 +855,6 @@ if __name__ == '__main__':
         alignment=ui.ALIGN_RIGHT,
         border_color='white',
         border_width=1,
-        #background_color='red',
         frame=sv.bounds,
         flex='WH',
         touch_enabled=True,
@@ -867,18 +888,15 @@ if __name__ == '__main__':
         image=ui.Image('iow:drag_32'),
         tint_color='white',
         action=open_and_close)
-    dock(menu_button, main_view).top_left()
+    dock(main_view).top_left(menu_button)
 
     At(menu_view).right = At(main_view).left
     mv = At(main_view)
     
     bottom_bar = ui.View(
         background_color='grey',
-        border_color='red',
-        border_width=5,
     )
-    main_view.add_subview(bottom_bar)
-    dock(bottom_bar).bottom()
+    dock(main_view).bottom(bottom_bar)
 
     pointer = ui.ImageView(
         image=ui.Image('iow:ios7_navigate_outline_256'),
@@ -887,7 +905,7 @@ if __name__ == '__main__':
         content_mode=ui.CONTENT_SCALE_ASPECT_FIT,
     )
     
-    dock(pointer, main_view).center
+    dock(main_view).center(pointer)
     at(pointer).heading_adjustment = math.pi / 4
     
     mover = Mover(main_view)

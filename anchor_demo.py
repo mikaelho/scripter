@@ -29,58 +29,41 @@ root = ui.View(
 )
 set_scripter_view(root)
 
-title_area = size_to_fit(ui.Label(
-    text='adjust standard gap, e.g. fit tight without gap'))
-dock(title_area, root, At.TIGHT).top
-
-content_area = ui.View()
-dock(content_area, root, At.TIGHT).bottom()
-at(content_area).top = at(title_area).bottom + At.TIGHT
-
-button_area = ui.View()
-flex_area = ui.View()
-pointer_area = ui.View()
-
-'''
-fill(content_area).from_top(
-    button_area,
-    flex_area,
-    pointer_area
-)
-'''
-
+button_area = style(ui.View())
+dock(root).bottom(button_area, At.TIGHT)
 buttons = [
-    size_to_fit(ui.Button(
-        title=f'button {i + 1}'))
-    for i in range(10)
+    size_to_fit(style(ui.Button(
+        title=f'button {i + 1}')))
+    for i in range(6)
 ]
-for btn in buttons:
-    button_area.add_subview(btn)
 flow(button_area).from_top_left(*buttons)
-
-dock(button_area, content_area).top
 at(button_area).height = at(button_area).fit_height
 
-style(
-    title_area,
-    content_area,
-    button_area,
-    #flex_area,
-    #pointer_area,
-    *buttons,
+content_area = style(ui.View())
+dock(root).top(content_area, At.TIGHT)
+at(content_area).bottom = at(button_area).top - At.TIGHT
+
+at_area = style(ui.Label(text='basic at & flex'))
+pointer_area = style(ui.Label(text='pointer'))
+dock_area = style(ui.View())
+align_area = style(ui.Label(text='align'))
+
+fill(content_area, 2).from_top(
+    at_area,
+    dock_area,
+    pointer_area,
+    align_area,
 )
 
-safe_area_note = size_to_fit(style_label(ui.Label(
-    text='respect safe area by default')))
-dock(safe_area_note, content_area, 1).bottom
+def make_label(text):
+    return size_to_fit(style(ui.Label(
+        text=text,
+        number_of_lines=0)))
 
-# Rotation makes things complicated
-fill_note = size_to_fit(style_label(ui.Label(
-    text='stretch views to fill available area')))
-content_area.add_subview(fill_note)
-fill_note.transform = ui.Transform.rotation(math.pi/2)
-at(fill_note).center_x = at(content_area).right - fill_note.height / 2 - At.gap - 1
-at(fill_note).center_y = at(content_area).center_y
+dock(dock_area).top_center(make_label('top\ncenter'))
+dock(dock_area).left(make_label('left'))
+dock(dock_area).center(make_label('center'))
+dock(dock_area).bottom_right(make_label('bottom\nright'))
 
 root.present('fullscreen', 
     animated=False,
