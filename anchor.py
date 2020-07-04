@@ -102,8 +102,8 @@ width:
         value: value
     source:
         regular: source.width
-        container: source.bounds.width - 2 * border_gap
-        safe: safe.size.width - 2 * border_gap
+        container: source.bounds.width - 2 * At.gap
+        safe: safe.size.width - 2 * At.gap
 height:
     type: neutral
     target:
@@ -111,8 +111,8 @@ height:
         value: value
     source:
         regular: source.height
-        container: source.bounds.height - 2 * border_gap
-        safe: safe.size.height - 2 * border_gap
+        container: source.bounds.height - 2 * At.gap
+        safe: safe.size.height - 2 * At.gap
 position:
     type: neutral
     target:
@@ -237,7 +237,7 @@ class At:
             
             if self.source_prop in _rules:
                 source_value = _rules[self.source_prop]['source'][self.type]
-                source_value = source_value.replace('border_gap', str(At.gap))
+                #source_value = source_value.replace('border_gap', str(At.gap))
             else:
                 source_value = _rules['attr']['source']['regular']
                 source_value = source_value.replace('_custom', self.source_prop)
