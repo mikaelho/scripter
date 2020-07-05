@@ -1,2 +1,4 @@
 /venv/
 /dist/
+/.idea/
+/scripter/__pycache__/
