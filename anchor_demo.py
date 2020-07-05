@@ -124,23 +124,25 @@ target.font = (target.font[0], 44)
 at(target).center_x = at(pointer_area).center_x / 1.75
 at(target).center_y = at(pointer_area).height - 60
 
-pointer = make_symbol('→')
-pointer.font = (pointer.font[0], 28)
+pointer = make_symbol('↣')
+pointer.text_color = accent_color
+pointer.background_color = 'transparent'
+pointer.font = (pointer.font[0], 40)
 align(pointer_area).center(pointer)
 at(pointer).heading = at(target).center
 
-heading_label = ui.Label(text='000',
-    font=('Anonymous Pro', 12),
+heading_label = ui.Label(text='000°',
+    font=('Arial Rounded MT Bold', 12),
     text_color=accent_color,
     alignment=ui.ALIGN_CENTER,
 )
 heading_label.size_to_fit()
 pointer_area.add_subview(heading_label)
-at(heading_label).center_x = at(pointer).center_x
-at(heading_label).top = at(pointer).center_y + 25
+at(heading_label).center_y = at(pointer).center_y - 22
+align(pointer).center_x(heading_label)
 
 attr(heading_label).text = at(pointer).heading + (
-    lambda angle: f"{int(math.degrees(angle))%360:03}"
+    lambda angle: f"{int(math.degrees(angle))%360:03}°"
 )
 
 #  ----- Dock
@@ -164,6 +166,68 @@ at(l3).center_x = at(align_area).center_x / 2 * 3
 
 align(align_area).center_y(l1, l2, l3)
     
+
+# ------ Markers
+
+marker_counter = 0
+
+def create_marker(superview):
+    global marker_counter
+    marker_counter += 1
+    marker = make_label(str(marker_counter))
+    superview.add_subview(marker)
+    marker.background_color = 'white'
+    marker.border_color = 'black'
+    marker.border_width = 1
+    size_to_fit(marker)
+    marker.width = marker.height
+    marker.objc_instance.clipsToBounds = True
+    marker.corner_radius = marker.width / 2
+    return marker
+    
+m1 = create_marker(at_area)
+align(basic_at).center_y(m1)
+at(m1).left = at(basic_at).right
+
+m2 = create_marker(at_area)
+align(flex).left(m2)
+at(m2).center_y = at(flex).top - At.gap
+
+m3 = create_marker(at_area)
+align(flex).right(m3)
+at(m3).center_y = at(flex).top - At.gap
+
+m4 = create_marker(pointer_area)
+at(m4).top = at(pointer).bottom + 3*At.TIGHT
+at(m4).left = at(pointer).right + 3*At.TIGHT
+
+m5 = create_marker(pointer_area)
+align(heading_label).center_y(m5)
+at(m5).left = at(heading_label).right
+
+m6 = create_marker(dock_area)
+at(m6).center_x = at(dock_area).center_x * 1.5
+at(m6).center_y = at(dock_area).center_y / 2
+
+m7 = create_marker(align_area)
+align(align_area).center_x(m7)
+at(m7).top = at(l2).bottom
+
+mc = create_marker(content_area)
+at(mc).center = at(content_area).center
+
+mb = create_marker(button_area)
+last_button = buttons[-1]
+align(last_button).center_y(mb)
+at(mb).left = at(last_button).right
+
+mr = create_marker(root)
+align(button_area).center_x(mr)
+at(mr).center_y = at(button_area).top
+
+ms = create_marker(root)
+at(ms).center_x = at(button_area).center_x * 1.5
+at(ms).center_y = at(button_area).bottom
 
 root.present('fullscreen', 
     animated=False,
