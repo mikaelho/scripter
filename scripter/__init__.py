@@ -1,5 +1,9 @@
 #coding: utf-8
 
+"""iOS Pythonista app UI and Scene animations and UI constraints"""
+
+__version__ = '2020-07-05'
+
 '''
 # _SCRIPTER_ - Pythonista UI and Scene animations
 
