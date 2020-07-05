@@ -18,7 +18,7 @@ def style(*views):
 
 def style2(*views):
     for v in views:
-        v.background_color = 'grey'
+        v.background_color = '#cae8ff'
         v.text_color = v.tint_color = 'black'
         v.alignment = ui.ALIGN_CENTER
         v.font = ('Arial Rounded MT Bold', 12)
@@ -35,7 +35,7 @@ def create_area(title):
     area = style(ui.View())
     label = style_label(size_to_fit(ui.Label(
         text=title.upper(),
-        number_of_lines=0,
+        #number_of_lines=0,
         font=('Arial Rounded MT Bold', 12),
     )))
     dock(area).top_right(label, At.TIGHT)
@@ -70,7 +70,7 @@ dock(root).top(content_area, At.TIGHT)
 at(content_area).bottom = at(button_area).top - At.TIGHT
 
 at_area = create_area('basic at & flex')
-pointer_area = create_area('heading,\ncustom,\nfunc')
+pointer_area = create_area('heading, custom, func')
 dock_area = create_area('dock')
 align_area = create_area('align')
 
@@ -86,22 +86,45 @@ def make_label(text):
         text=text,
         number_of_lines=0)))
 
+#  ----- At & flex
+
+bulwark = style(ui.View(width=10))
+at_area.add_subview(bulwark)
+at(bulwark).center_x = at(at_area).width / 5
+align(at_area).center_y(bulwark)
+at(bulwark).height = at(at_area).height * 0.75
+
+basic_at = make_label('fix left')
+at_area.add_subview(basic_at)
+at(basic_at).left = at(bulwark).right
+align(bulwark, -30).center_y(basic_at)
+
+flex = make_label('fix left and right')
+at_area.add_subview(flex)
+at(flex).left = at(bulwark).right + At.TIGHT
+at(flex).right = at(at_area).right
+align(bulwark, +30).center_y(flex)
+
+#  ----- Dock
+
 dock(dock_area).top_center(make_label('top\ncenter'))
 dock(dock_area).left(make_label('left'))
 dock(dock_area).center(make_label('center'))
 dock(dock_area).bottom_right(make_label('bottom\nright'))
 
+#  ----- Align
+
 l1 = make_label('1')
 align_area.add_subview(l1)
-at(l1).center_x = at(align_area).width / 4
-at(l1).center_y = at(align_area).center_y
+at(l1).center_x = at(align_area).center_x / 2
 l2 = make_label('2')
 align_area.add_subview(l2)
-at(l2).center_x = at(align_area).width / 2
+at(l2).center_x = at(align_area).center_x
 l3 = make_label('3')
 align_area.add_subview(l3)
-at(l3).center_x = at(align_area).width * 3 / 4
-align(l1).center_y(l2, l3)
+at(l3).center_x = at(align_area).center_x / 2 * 3
+
+align(align_area).center_y(l1, l2, l3)
     
 
 root.present('fullscreen', 

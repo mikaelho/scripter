@@ -550,18 +550,6 @@ class Dock:
                 setattr(v, prop, getattr(sv, prop) + sign * modifier)
             else:
                 setattr(v, prop, getattr(sv, prop))
-    """
-    def __getattribute__(self, attr):
-        '''
-        Dock methods do not have to be called       
-        You can just say `Dock(view).center`
-        '''
-        attr_object = super().__getattribute__(attr)
-        if type(attr_object) == partial:
-            attr_object()
-            attr_object = lambda: None
-        return attr_object
-    """
             
     all = partialmethod(_dock, 'TLBR')
     bottom = partialmethod(_dock, 'LBR')
@@ -580,27 +568,6 @@ class Dock:
     right_center = partialmethod(_dock, 'RY')
     center = partialmethod(_dock, 'C')
     
-    '''
-    @script
-    def between(self, a, b):
-        yield
-        delta_y = abs(a.center.y - b.center.y)
-        delta_x = abs(a.center.x - b.center.x)
-        is_vertical = delta_y > delta_x
-        a_a = at(a)
-        a_b = at(b)
-        a_self = at(self.view)
-        if is_vertical:
-            a_self.top = a_a.bottom + self.modifier
-            a_self.bottom = a_b.top - self.modifier
-            a_self.width = a_a.width
-            a_self.center_x = a_a.center_x
-        else:
-            a_self.left = a_a.right + self.modifier
-            a_self.right = a_b.left - self.modifier
-            a_self.height = a_a.height
-            a_self.center_y = a_a.center_y
-    '''
     def between(self, top=None, bottom=None, left=None, right=None):
         a_self = at(self.view)
         if top:
@@ -646,12 +613,20 @@ def dock(superview) -> Dock:
     
 class Align:
     
-    def __init__(self, view):
+    modifiable = 'left right top bottom center_x center_y width height heading'
+    
+    def __init__(self, view, modifier=0):
         self.anchor_at = at(view)
+        self.modifier = modifier
         
     def _align(self, prop, *others):
+        use_modifier = prop in self.modifiable.split()
         for other in others:
-            setattr(at(other), prop, getattr(self.anchor_at, prop))
+            if use_modifier:
+                setattr(at(other), prop, 
+                    getattr(self.anchor_at, prop) + self.modifier)
+            else:
+                setattr(at(other), prop, getattr(self.anchor_at, prop))
     
     left = partialmethod(_align, 'left')
     right = partialmethod(_align, 'right')
@@ -662,10 +637,14 @@ class Align:
     center_y = partialmethod(_align, 'center_y')
     width = partialmethod(_align, 'width')
     height = partialmethod(_align, 'height')
+    position = partialmethod(_align, 'position')
+    size = partialmethod(_align, 'size')
+    frame = partialmethod(_align, 'frame')
+    bounds = partialmethod(_align, 'bounds')
     heading = partialmethod(_align, 'heading')
     
-def align(view):
-    return Align(view)
+def align(view, modifier=0):
+    return Align(view, modifier)
     
     
 class Fill:
