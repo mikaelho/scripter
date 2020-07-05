@@ -4,7 +4,7 @@ import ui
 
 from scripter import set_scripter_view
 
-from anchor import *
+from scripter.anchor import *
 
 
 accent_color = '#cae8ff'
@@ -48,6 +48,8 @@ root = ui.View(
 )
 set_scripter_view(root)
 
+# ------ Button flow
+
 button_area = style(ui.View())
 dock(root).bottom(button_area, At.TIGHT)
 button_label = style_label(ui.Label(
@@ -90,22 +92,22 @@ def make_label(text):
 
 #  ----- At & flex
 
-bulwark = style(ui.View(width=10))
-at_area.add_subview(bulwark)
-at(bulwark).center_x = at(at_area).width / 5
-align(at_area).center_y(bulwark)
-at(bulwark).height = at(at_area).height * 0.75
+vertical_bar = style(ui.View(width=10))
+at_area.add_subview(vertical_bar)
+at(vertical_bar).center_x = at(at_area).width / 5
+align(at_area).center_y(vertical_bar)
+at(vertical_bar).height = at(at_area).height * 0.75
 
-basic_at = make_label('fix left')
-at_area.add_subview(basic_at)
-at(basic_at).left = at(bulwark).right
-align(bulwark, -30).center_y(basic_at)
+fix_left = make_label('fix left')
+at_area.add_subview(fix_left)
+at(fix_left).left = at(vertical_bar).right
+align(vertical_bar, -30).center_y(fix_left)
 
 flex = make_label('fix left and right')
 at_area.add_subview(flex)
-at(flex).left = at(bulwark).right + At.TIGHT
+at(flex).left = at(vertical_bar).right + At.TIGHT
 at(flex).right = at(at_area).right
-align(bulwark, +30).center_y(flex)
+align(vertical_bar, +30).center_y(flex)
 
 # ------ Heading & custom
 
@@ -149,8 +151,10 @@ attr(heading_label).text = at(pointer).heading + (
 
 dock(dock_area).top_center(make_label('top\ncenter'))
 dock(dock_area).left(make_label('left'))
-dock(dock_area).center(make_label('center'))
 dock(dock_area).bottom_right(make_label('bottom\nright'))
+center_label = make_label('center')
+dock(dock_area).center(center_label)
+#dock(center_label).above(make_label('below'))
 
 #  ----- Align
 
@@ -169,65 +173,69 @@ align(align_area).center_y(l1, l2, l3)
 
 # ------ Markers
 
-marker_counter = 0
+show_markers = False
 
-def create_marker(superview):
-    global marker_counter
-    marker_counter += 1
-    marker = make_label(str(marker_counter))
-    superview.add_subview(marker)
-    marker.background_color = 'white'
-    marker.border_color = 'black'
-    marker.border_width = 1
-    size_to_fit(marker)
-    marker.width = marker.height
-    marker.objc_instance.clipsToBounds = True
-    marker.corner_radius = marker.width / 2
-    return marker
+if show_markers:
+
+    marker_counter = 0
     
-m1 = create_marker(at_area)
-align(basic_at).center_y(m1)
-at(m1).left = at(basic_at).right
-
-m2 = create_marker(at_area)
-align(flex).left(m2)
-at(m2).center_y = at(flex).top - At.gap
-
-m3 = create_marker(at_area)
-align(flex).right(m3)
-at(m3).center_y = at(flex).top - At.gap
-
-m4 = create_marker(pointer_area)
-at(m4).top = at(pointer).bottom + 3*At.TIGHT
-at(m4).left = at(pointer).right + 3*At.TIGHT
-
-m5 = create_marker(pointer_area)
-align(heading_label).center_y(m5)
-at(m5).left = at(heading_label).right
-
-m6 = create_marker(dock_area)
-at(m6).center_x = at(dock_area).center_x * 1.5
-at(m6).center_y = at(dock_area).center_y / 2
-
-m7 = create_marker(align_area)
-align(align_area).center_x(m7)
-at(m7).top = at(l2).bottom
-
-mc = create_marker(content_area)
-at(mc).center = at(content_area).center
-
-mb = create_marker(button_area)
-last_button = buttons[-1]
-align(last_button).center_y(mb)
-at(mb).left = at(last_button).right
-
-mr = create_marker(root)
-align(button_area).center_x(mr)
-at(mr).center_y = at(button_area).top
-
-ms = create_marker(root)
-at(ms).center_x = at(button_area).center_x * 1.5
-at(ms).center_y = at(button_area).bottom
+    def create_marker(superview):
+        global marker_counter
+        marker_counter += 1
+        marker = make_label(str(marker_counter))
+        superview.add_subview(marker)
+        marker.background_color = 'white'
+        marker.border_color = 'black'
+        marker.border_width = 1
+        size_to_fit(marker)
+        marker.width = marker.height
+        marker.objc_instance.clipsToBounds = True
+        marker.corner_radius = marker.width / 2
+        return marker
+        
+    m1 = create_marker(at_area)
+    align(fix_left).center_y(m1)
+    at(m1).left = at(fix_left).right
+    
+    m2 = create_marker(at_area)
+    align(flex).left(m2)
+    at(m2).center_y = at(flex).top - At.gap
+    
+    m3 = create_marker(at_area)
+    align(flex).right(m3)
+    at(m3).center_y = at(flex).top - At.gap
+    
+    m4 = create_marker(pointer_area)
+    at(m4).top = at(pointer).bottom + 3*At.TIGHT
+    at(m4).left = at(pointer).right + 3*At.TIGHT
+    
+    m5 = create_marker(pointer_area)
+    align(heading_label).center_y(m5)
+    at(m5).left = at(heading_label).right
+    
+    m6 = create_marker(dock_area)
+    at(m6).center_x = at(dock_area).center_x * 1.5
+    at(m6).center_y = at(dock_area).center_y / 2
+    
+    m7 = create_marker(align_area)
+    align(align_area).center_x(m7)
+    at(m7).top = at(l2).bottom
+    
+    mc = create_marker(content_area)
+    at(mc).center = at(content_area).center
+    
+    mb = create_marker(button_area)
+    last_button = buttons[-1]
+    align(last_button).center_y(mb)
+    at(mb).left = at(last_button).right
+    
+    mr = create_marker(root)
+    align(button_area).center_x(mr)
+    at(mr).center_y = at(button_area).top
+    
+    ms = create_marker(root)
+    at(ms).center_x = at(button_area).center_x * 1.5
+    at(ms).center_y = at(button_area).bottom
 
 root.present('fullscreen', 
     animated=False,
