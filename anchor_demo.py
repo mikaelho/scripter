@@ -7,6 +7,8 @@ from scripter import set_scripter_view
 from anchor import *
 
 
+accent_color = '#cae8ff'
+
 def style(*views):
     for v in views:
         v.background_color = 'black'
@@ -18,7 +20,7 @@ def style(*views):
 
 def style2(*views):
     for v in views:
-        v.background_color = '#cae8ff'
+        v.background_color = accent_color
         v.text_color = v.tint_color = 'black'
         v.alignment = ui.ALIGN_CENTER
         v.font = ('Arial Rounded MT Bold', 12)
@@ -104,6 +106,42 @@ at_area.add_subview(flex)
 at(flex).left = at(bulwark).right + At.TIGHT
 at(flex).right = at(at_area).right
 align(bulwark, +30).center_y(flex)
+
+# ------ Heading & custom
+
+def make_symbol(character):
+    symbol = make_label(character)
+    symbol.font = ('Arial Rounded MT Bold', 18)
+    pointer_area.add_subview(symbol)
+    size_to_fit(symbol)
+    symbol.width = symbol.height
+    symbol.objc_instance.clipsToBounds = True
+    symbol.corner_radius = symbol.width / 2
+    return symbol
+
+target = make_symbol('⌾')
+target.font = (target.font[0], 44)
+at(target).center_x = at(pointer_area).center_x / 1.75
+at(target).center_y = at(pointer_area).height - 60
+
+pointer = make_symbol('→')
+pointer.font = (pointer.font[0], 28)
+align(pointer_area).center(pointer)
+at(pointer).heading = at(target).center
+
+heading_label = ui.Label(text='000',
+    font=('Anonymous Pro', 12),
+    text_color=accent_color,
+    alignment=ui.ALIGN_CENTER,
+)
+heading_label.size_to_fit()
+pointer_area.add_subview(heading_label)
+at(heading_label).center_x = at(pointer).center_x
+at(heading_label).top = at(pointer).center_y + 25
+
+attr(heading_label).text = at(pointer).heading + (
+    lambda angle: f"{int(math.degrees(angle))%360:03}"
+)
 
 #  ----- Dock
 
