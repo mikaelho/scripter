@@ -2,7 +2,7 @@
 
 """iOS Pythonista app UI and Scene animations and UI constraints"""
 
-__version__ = '2020.11.15'
+__version__ = '2020.11.16'
 
 '''
 # _SCRIPTER_ - Pythonista UI and Scene animations
@@ -86,14 +86,16 @@ import inspect
 
 
 default_duration = 0.5
+
 scripter_view = None
 
-'''
-def set_scripter_view(view):
+def start_scripter(view):
+    """
+    This must be called with your root view
+    before any scripts are called.
+    """
     global scripter_view
-    
     scripter_view = view
-'''
 
 #docgen: Script management
 
@@ -187,7 +189,13 @@ def find_scripter_instance():
     Scripter instance to run them, you need to use this method first to find the
     right one.
     '''
-    view = find_root_view()
+
+    global scripter_view
+    if scripter_view is None:
+        raise RuntimeError(
+            'Call  start_scripter() before calling the first script')
+    view = scripter_view
+
     if isnode(view):
         if hasattr(view, 'view'):
             view = view.view # Scene root node
@@ -196,41 +204,41 @@ def find_scripter_instance():
                 raise ValueError('Node must be added to a Scene before animations')
             view = view.scene.view
 
-    while view:
+    while True:
         if isinstance(view, Scripter):
             return view
         for subview in view.subviews:
             if isinstance(subview, Scripter):
                 return subview
-        parent = view.superview
-        if parent:
-            view = parent
-        else:
+        if not view.superview:
             break
+        view = view.superview
     # If not found, create a new one as a hidden
     # subview of the root view
     scr = Scripter(hidden=True)
     view.add_subview(scr)
     return scr
 
-@lru_cache()
 def find_root_view():
     """
     Locates the first `present`ed view.
-    You can also set the root view manually with the `set_scripter_view` function. 
+    You can also set the root view manually with the `set_scripter_view`
+    function.
+    
+    NOT USED, turned out to be unreliable.
     """
     #global scripter_view
     
     #if scripter_view is not None:
     #    return scripter_view
-    
     SUIView_PY3 = objc_util.ObjCClass('SUIView_PY3')
     candidates =  [objc_util.UIApplication.sharedApplication().windows()[0]]
-    while len(candidates) > 0:
-        objc_view = candidates.pop()
+    #while len(candidates) > 0:
+    for objc_view in candidates:
+        #objc_view = candidates.pop()
         if objc_view.isKindOfClass_(SUIView_PY3.ptr):
             return objc_view.pyObject(
-                argtypes=[], restype=ctypes.py_object)
+                argtypes=[], restype=ctypes.c_void_p)
         candidates.extend(objc_view.subviews())
     raise Exception('Root view not found')
 
@@ -338,7 +346,7 @@ class Scripter(View):
                     if gen_to_pause in self.active_gens:
                         self.active_gens.remove(gen_to_pause)
                         self.paused.add(gen_to_pause)
-                        print('PAUSED', gen_to_pause)
+                        #print('PAUSED', gen_to_pause)
                     elif gen_to_pause in self.standby_gens:
                         to_process.extend(self.standby_gens[gen_to_pause])
             self.pause_queue = set()
@@ -1330,6 +1338,7 @@ if __name__ == '__main__':
             return value
 
     v = DemoBackground()
+    start_scripter(v)
     v.background_color = 'white'
     v.present('fullscreen')
     
@@ -1522,4 +1531,3 @@ if __name__ == '__main__':
         text_color='green',
         frame=(40, v.height-50, v.width-80, 40))
     v.add_subview(m)
-
