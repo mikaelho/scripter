@@ -88,10 +88,12 @@ import inspect
 default_duration = 0.5
 scripter_view = None
 
+'''
 def set_scripter_view(view):
     global scripter_view
     
     scripter_view = view
+'''
 
 #docgen: Script management
 
@@ -167,7 +169,6 @@ def isnode(view):
     ''' Returns True if argument is an instance of a subclass of scene.Node. '''
     return issubclass(type(view), Node)
 
-@lru_cache(maxsize=1)
 def find_scripter_instance():
     '''
     _Can be used with Scene Nodes._
@@ -212,24 +213,24 @@ def find_scripter_instance():
     view.add_subview(scr)
     return scr
 
-@lru_cache(maxsize=1)
+@lru_cache()
 def find_root_view():
     """
     Locates the first `present`ed view.
+    You can also set the root view manually with the `set_scripter_view` function. 
     """
-    global scripter_view
+    #global scripter_view
     
-    if scripter_view is not None:
-        return scripter_view
+    #if scripter_view is not None:
+    #    return scripter_view
     
     SUIView_PY3 = objc_util.ObjCClass('SUIView_PY3')
     candidates =  [objc_util.UIApplication.sharedApplication().windows()[0]]
     while len(candidates) > 0:
         objc_view = candidates.pop()
         if objc_view.isKindOfClass_(SUIView_PY3.ptr):
-            scripter_view = objc_view.pyObject(
+            return objc_view.pyObject(
                 argtypes=[], restype=ctypes.py_object)
-            return scripter_view
         candidates.extend(objc_view.subviews())
     raise Exception('Root view not found')
 
@@ -501,6 +502,11 @@ def cancel(gen):
     
 @script(flow_control=True)
 def queue(*gens):
+    """
+    Sometimes it is more convenient to
+    list the scripts to be executed in order
+    than separate them with yields.
+    """
     scr = find_scripter_instance()
     if any([scr.parent_gens[gen] == 'root' for gen in gens]):
         raise RuntimeError('queue function used outside a script')
@@ -1384,29 +1390,41 @@ if __name__ == '__main__':
             yield 'wait'
             move(self, 200, 200)
             yield
+            
             # Combine a primitive with a lambda and
             # target the contained Label instead of self
             set_value(self.l, 'text', range(1, 101), lambda count: f'Count: {count}')
             yield 1
+            
             # Transformations
             self.l.text = 'Rotating'
             rotate(self, -720, ease_func=ease_back_in_out, duration=1.5)
-            #slide_color(self, 'background_color', 'green', duration=2.0)
             background_color(self, 'green', duration=2.0)
             slide_color(self.l, 'text_color', 'white', duration=2.0)
             yield 'wait'
-            self.l.text = 'Move two'
+            
             # Create another view and control it as well
-            # Use another function to control animation
-            # "tracks"
-            self.other = View(background_color='red', frame=(10, 200, 150, 40))
-            v.add_subview(self.other)
-            self.sub_script()
-            move(self.other, 200, 400)
+            # Use group and queue to drive parallel animations without
+            # necessarily having to break the flow with a separate function
+            self.l.text = 'Move two'
+            other = View(background_color='red', frame=(10, 200, 150, 40))
+            v.add_subview(other)
+            group(
+                move(other, 200, 400),
+                queue(
+                    move(self, 50, 200),
+                    move(self, 50, 400),
+                )
+            )
+            yield
+            hide(other)
+            fly_out(other, 'down')
+            yield
+            v.remove_subview(other)
             yield 'wait'
 
-            self.l.text = 'Custom'
             # Driving custom View.draw animation
+            self.l.text = 'Custom'
             self.c.hidden = False
             background_color(self, 'transparent')
             text_color(self.l, 'black')
@@ -1414,7 +1432,8 @@ if __name__ == '__main__':
             set_value(v, 'axes_counter', range(1, 210, 3), func=v.trigger_refresh)
             yield 'wait'
             slide_value(v, 'curve_point_x', 200, start_value=1, duration=2.0)
-            slide_value(v, 'curve_point_y', 200, start_value=1, ease_func=ease_back_in_out, map_func=v.trigger_refresh, duration=2.0)
+            slide_value(v, 'curve_point_y', 200, start_value=1, 
+            ease_func=ease_back_in_out, map_func=v.trigger_refresh, duration=2.0)
             yield 'wait'
 
             x(self, self.x+200, duration=2.0)
@@ -1432,7 +1451,8 @@ if __name__ == '__main__':
             v.set_needs_display()
             yield
             x(self, v.start_point.x, ease_func='easeOut', duration=2.0)
-            y(self, v.start_point.y-self.height, ease_func=scene_drawing.curve_bounce_out, duration=2.0)
+            y(self, v.start_point.y-self.height, 
+            ease_func=scene_drawing.curve_bounce_out, duration=2.0)
             yield 1.0
 
             self.l.text = 'Roll'
@@ -1454,17 +1474,6 @@ if __name__ == '__main__':
 
             content_offset(self.tv, (0, self.tv.content_size[1]), duration=20)
             self.end_fade()
-
-        @script
-        def sub_script(self):
-            move(self, 50, 200)
-            yield
-            move(self, 50, 400)
-            yield
-            hide(self.other)
-            fly_out(self.other, 'down')
-            yield
-            v.remove_subview(self.other)
 
         @script
         def end_fade(self):
@@ -1506,6 +1515,11 @@ if __name__ == '__main__':
     
     gradient(b, duration=2.0)
 
-    m = ScrollingBannerLabel(text='This is a scripter test, with an info text that is too long to fit on screen at once.', font=('Futura', 24), text_color='green', frame=(40, v.height-50, v.width-80, 40))
+    m = ScrollingBannerLabel(
+        text='This is a scripter test, with an info text that is '
+        'too long to fit on screen at once.', 
+        font=('Futura', 24), 
+        text_color='green',
+        frame=(40, v.height-50, v.width-80, 40))
     v.add_subview(m)
 
