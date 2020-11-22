@@ -118,9 +118,8 @@ def script(func, flow_control=False):
     '''
     _Can be used with Scene Nodes._
 
-    Decorator for the animation scripts. Scripts can be functions, methods or generators.
-
-    First argument of decorated functions must always be the view to be animated.
+    Decorator for the animation scripts. 
+    Scripts can be functions, methods or generators.
 
     Calling a script starts the Scripter `update` loop, if not already running.
 
@@ -144,7 +143,6 @@ def script(func, flow_control=False):
             gen.__name__ = '_scripter_flow_controller'
             
         scr = find_scripter_instance()
-        
         scr.initialize(gen)
 
         return gen
@@ -193,7 +191,7 @@ def find_scripter_instance():
     global scripter_view
     if scripter_view is None:
         raise RuntimeError(
-            'Call  start_scripter() before calling the first script')
+            'Call start_scripter() before calling the first script')
     view = scripter_view
 
     if isnode(view):
@@ -291,6 +289,10 @@ class Scripter(View):
         self._default_update_interval = 1/value
         
     def initialize(self, gen):
+        queued = self.queued.get(self.current_gen)
+        if queued is not None:
+            queued.append(gen)
+            return
         self.parent_gens[gen] = self.current_gen
         if self.current_gen != 'root':
             self.standby_gens.setdefault(
@@ -328,10 +330,18 @@ class Scripter(View):
             for script in self.cancel_queue:
                 self._process_cancel(script)
             self.cancel_queue = set()
+            
+            # scripts with flow_control=True manage their children themselves
             to_postpone = set()
             for gen in self.activate:
+                if gen.__name__ == '_scripter_flow_controller' and gen not in to_postpone:
+                    print(gen, 'not there yet')
+                    
                 if gen.__name__ == '_scripter_flow_controller':
+                    assert gen not in gen.gi_frame.f_locals['gens'], 'gen in gens'
+                    assert gen not in to_postpone, f'{gen} to postpone before'
                     to_postpone.update(gen.gi_frame.f_locals['gens'])
+                    assert gen not in to_postpone, 'gen to postpone after'
             self.activate.difference_update(to_postpone)
             for gen in self.activate:
                 self.active_gens.add(gen)
@@ -443,6 +453,7 @@ class Scripter(View):
         self.play_queue = set()
         self.pause_queue = set()
         self.cancel_queue = set()
+        self.queued = {}
 
     def pause_play_all(self):
         ''' Pause or play all animations. '''
@@ -508,6 +519,28 @@ def cancel(gen):
     scr = find_scripter_instance()
     scr.cancel(gen)
     
+@contextmanager
+def steps():
+    """
+    Scripts within a steps block are run as 
+    if they had `yield` between each script
+    """
+    scr = find_scripter_instance()
+    scr.queued[scr.current_gen] = []
+    
+    yield
+    
+    queued = scr.queued[scr.current_gen]
+    del scr.queued[scr.current_gen]
+    if len(queued):
+        @script
+        def run_queue(gens):
+            for gen in gens:
+                scr.initialize(gen)
+                yield
+        run_queue(queued)
+
+
 @script(flow_control=True)
 def queue(*gens):
     """
@@ -515,6 +548,7 @@ def queue(*gens):
     list the scripts to be executed in order
     than separate them with yields.
     """
+    print(gens)
     scr = find_scripter_instance()
     if any([scr.parent_gens[gen] == 'root' for gen in gens]):
         raise RuntimeError('queue function used outside a script')
@@ -525,6 +559,9 @@ def queue(*gens):
     
 @script(flow_control=True)
 def group(*gens):
+    """
+    Complement to queue, grouping scripts to be run in parallel.
+    """
     scr = find_scripter_instance()
     if any([scr.parent_gens[gen] == 'root' for gen in gens]):
         raise RuntimeError('group function used outside a script')
@@ -1343,27 +1380,20 @@ if __name__ == '__main__':
     v.present('fullscreen')
     
     @script
-    def dummy(count):
-        print(f'bang {count}')
+    def printer(count):
+        print(f'- Script {count}')
         
     @script
-    def launch_group():
-        queue(
-            dummy('two'),
-            group(
-                queue(
-                    dummy('three'),
-                    dummy('four')
-                ),
-                queue(
-                    dummy('five'),
-                    dummy('six')
-                )
-            )
-        )
-        print('set')
+    def steps_block_test():
+        print('Steps block test:')
+        with steps():
+            printer('A.1')
+            printer('A.2')
+        with steps():
+            printer('B.1')
+            printer('B.2')
         
-    launch_group()
+    steps_block_test()
 
     class Demo(View):
 
@@ -1413,18 +1443,15 @@ if __name__ == '__main__':
             yield 'wait'
             
             # Create another view and control it as well
-            # Use group and queue to drive parallel animations without
+            # Use a steps block to drive parallel animations without
             # necessarily having to break the flow with a separate function
             self.l.text = 'Move two'
             other = View(background_color='red', frame=(10, 200, 150, 40))
             v.add_subview(other)
-            group(
-                move(other, 200, 400),
-                queue(
-                    move(self, 50, 200),
-                    move(self, 50, 400),
-                )
-            )
+            move(other, 200, 400, duration=1.0)
+            with steps():
+                move(self, 50, 200)
+                move(self, 50, 400)
             yield
             hide(other)
             fly_out(other, 'down')
