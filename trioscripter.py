@@ -22,7 +22,7 @@ asks.init('trio')
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 #trio._core._run._MAX_TIMEOUT = 1.0
 
-import functools, types, inspect, time
+import asyncio, functools, inspect, time, types
 
 from overlay import Overlay, AppWindows
 import ui, objc_util
